@@ -1,30 +1,42 @@
-# DropZone 假头颅显示配置
-# 玩家可见文本请修改 lang/zh_cn.yml。
+# DropZone 头颅显示设置
+# 这里主要调头颅在玩家眼里的位置和表现。
 
 fake-entity:
-  # 当前只保留 ProtocolLib 后端；旧配置 packetevents 会自动回退并提示。
+  # 显示头颅用的插件后端，目前请保持 protocolib。
   packet-backend: "protocolib"
 
-  # debug-packets 会输出每次发包细节，只建议临时排查时打开。
+  # 排查显示问题时再打开，平时保持关闭，避免控制台刷屏。
   debug-packets: false
 
-  # 打开后能看到假 ArmorStand 本体，方便判断高度和位置；排查完请关闭。
+  # 打开后会露出用于挂头颅的隐形架子，方便看清头颅到底偏到哪里。
   debug-visible-armorstand: false
 
-  # ProtocolLib 假 ArmorStand 头盔坐标相对奖励点坐标的 Y 偏移。
-  # 头颅偏低可调为 -0.65；头颅偏高可调为 -1.05。
+  # 调头颅高度。头颅卡进方块就调大一点，例如 -0.65；飘得太高就调小一点，例如 -1.05。
   armor-stand-y-offset: -0.85
+  # 小号架子会让头颅尺寸更接近掉落奖励点的视觉效果。
   armor-stand-small: true
+  # 开启后碰撞点更小，但有些客户端会让头颅位置看起来不稳，默认关闭。
   armor-stand-marker: false
 
+  # 玩家距离奖励点多远以内才能看到头颅。
   view-distance: 48.0
+  # 玩家靠近到这个距离后，头颅会开始飞向玩家。
   attract-distance: 3.0
+  # 飞到这个距离以内就算领取。
   pickup-distance: 0.7
+  # 头颅飞向玩家的速度。
   fly-speed: 0.22
+  # 头颅位置刷新频率，数值越小越顺滑，也越频繁。
   update-interval-ticks: 2
+  # 头颅上下轻微浮动。
   bobbing: true
+  # 浮动幅度。
   bobbing-height: 0.25
+  # 头颅缓慢旋转。
   rotate: true
+  # 旋转速度。
   rotation-speed: 6.0
+  # 按奖励稀有度显示发光颜色。
   glow-by-rarity: true
+  # 没有匹配到稀有度颜色时，是否仍然发光。
   default-glow: false

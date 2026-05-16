@@ -83,32 +83,31 @@ spawn:
     respect-region: false
 
 navigation:
-  # 奖励点导航提示。开启后玩家 ActionBar 会显示最近奖励点的方向、距离和坐标。
-  # 如果你希望奖励点更“靠玩家自己找”，可以把 enabled 改为 false。
+  # 给玩家一点找奖励点的方向提示；想让玩家自己找，就关掉。
   actionbar:
     enabled: true
-    # 导航刷新间隔，单位 tick。20 tick = 1 秒。
+    # 提示刷新间隔，20 tick 约等于 1 秒。
     interval-ticks: 20
-    # 超过这个距离就不显示导航；0 表示不限制距离。
+    # 距离太远时不提示；0 表示不限制。
     max-distance: 0.0
 
 effects:
-  # 奖励点待机时的环境粒子，用来让远处玩家更容易发现奖励点。
+  # 奖励点旁边冒出的提示粒子，方便玩家发现。
   idle-particle:
     enabled: true
-    # 粒子名称，需使用当前服务端版本支持的 Bukkit 粒子名。
+    # 粒子名字，填当前服务端版本支持的 Bukkit 粒子名。
     name: "END_ROD"
-    # 粒子播放间隔，单位 tick。数值越小越明显，也越频繁。
+    # 粒子出现间隔，数值越小越密。
     interval-ticks: 10
-    # 每次播放的粒子数量。
+    # 每次冒几个粒子。
     count: 2
-    # 粒子散布范围，数值越大扩散越明显。
+    # 粒子散开的范围。
     offset-x: 0.18
     offset-y: 0.18
     offset-z: 0.18
-    # 粒子速度，一般保持很小即可。
+    # 粒子速度，一般不用调太大。
     speed: 0.01
-  # 玩家领取成功时播放的反馈效果。
+  # 玩家拿到奖励时的反馈。
   claim:
     # 领取音效。
     sound:
@@ -125,13 +124,13 @@ effects:
       offset-y: 0.6
       offset-z: 0.4
       speed: 0.02
-    # 领取成功时显示的标题，具体文字在 lang/zh_cn.yml。
+    # 屏幕中间的领取提示，文字在 lang/zh_cn.yml。
     title:
       enabled: true
       fade-in: 10
       stay: 40
       fade-out: 10
-    # 领取成功时显示的 ActionBar，具体文字在 lang/zh_cn.yml。
+    # 物品栏上方的领取提示，文字在 lang/zh_cn.yml。
     actionbar:
       enabled: true
 
