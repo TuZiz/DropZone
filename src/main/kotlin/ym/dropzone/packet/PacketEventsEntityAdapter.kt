@@ -4,14 +4,16 @@ import com.github.retrooper.packetevents.PacketEvents
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes
-import com.github.retrooper.packetevents.protocol.player.ClientVersion
+import com.github.retrooper.packetevents.protocol.player.Equipment
+import com.github.retrooper.packetevents.protocol.player.EquipmentSlot
 import com.github.retrooper.packetevents.util.Vector3d
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityVelocity
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity
 import io.github.retrooper.packetevents.util.SpigotConversionUtil
+import org.bukkit.Location
 import org.bukkit.entity.Player
 import ym.dropzone.entity.DropZoneEntity
 import java.util.Optional
@@ -19,21 +21,19 @@ import java.util.Optional
 // PacketEvents 版本适配集中在这里，业务层只调用 PacketEntityAdapter。
 class PacketEventsEntityAdapter : PacketEntityAdapter {
     override fun spawnItemEntity(player: Player, entity: DropZoneEntity) {
-        val loc = entity.currentLocation
-        val metadataIndex = runCatching { itemStackMetadataIndex(player) }.getOrDefault(-1)
+        val loc = armorStandLocation(entity.currentLocation)
         player.server.logger.info(
-            "[DropZone] spawnItemEntity: player=${player.name}, " +
+            "[DropZone] spawnArmorStandHead: player=${player.name}, " +
                 "entityId=${entity.runtimeEntityId}, " +
                 "item=${entity.itemStack.type}, " +
                 "amount=${entity.itemStack.amount}, " +
-                "index=$metadataIndex, " +
                 "loc=${loc.world?.name} ${loc.x},${loc.y},${loc.z}"
         )
-        // 只向指定玩家发送假物品实体，服务端不创建真实掉落物。
+        // 只向指定玩家发送假盔甲架头颅，服务端不创建真实实体或掉落物。
         val spawn = WrapperPlayServerSpawnEntity(
             entity.runtimeEntityId,
             Optional.of(entity.id),
-            EntityTypes.ITEM,
+            EntityTypes.ARMOR_STAND,
             Vector3d(loc.x, loc.y, loc.z),
             loc.pitch,
             loc.yaw,
@@ -42,14 +42,14 @@ class PacketEventsEntityAdapter : PacketEntityAdapter {
             Optional.of(Vector3d.zero())
         )
         send(player, spawn)
-        send(player, WrapperPlayServerEntityVelocity(entity.runtimeEntityId, Vector3d.zero()))
-        send(player, metadata(player, entity))
+        send(player, armorStandMetadata(entity))
+        send(player, equipmentPacket(entity))
     }
 
     override fun updateEntity(player: Player, entity: DropZoneEntity) {
-        val loc = entity.currentLocation
+        val loc = armorStandLocation(entity.currentLocation)
         send(player, WrapperPlayServerEntityTeleport(entity.runtimeEntityId, Vector3d(loc.x, loc.y, loc.z), entity.yaw, loc.pitch, false))
-        send(player, metadata(player, entity))
+        send(player, armorStandMetadata(entity))
     }
 
     override fun destroyEntity(player: Player, entityId: Int) {
@@ -61,23 +61,34 @@ class PacketEventsEntityAdapter : PacketEntityAdapter {
         send(player, WrapperPlayServerDestroyEntities(*entityIds.toIntArray()))
     }
 
-    private fun metadata(player: Player, entity: DropZoneEntity): WrapperPlayServerEntityMetadata {
-        val flags: Byte = if (entity.glowing) 0x40 else 0x00
-        val packetItem = SpigotConversionUtil.fromBukkitItemStack(entity.itemStack)
+    private fun armorStandLocation(location: Location): Location {
+        return location.clone().add(0.0, -1.35, 0.0)
+    }
+
+    private fun armorStandMetadata(entity: DropZoneEntity): WrapperPlayServerEntityMetadata {
+        val baseFlags: Byte = if (entity.glowing) {
+            (0x20 or 0x40).toByte()
+        } else {
+            0x20.toByte()
+        }
         return WrapperPlayServerEntityMetadata(
             entity.runtimeEntityId,
             listOf(
-                EntityData(0, EntityDataTypes.BYTE, flags),
+                EntityData(0, EntityDataTypes.BYTE, baseFlags),
                 EntityData(5, EntityDataTypes.BOOLEAN, true),
-                EntityData(itemStackMetadataIndex(player), EntityDataTypes.ITEMSTACK, packetItem)
+                EntityData(15, EntityDataTypes.BYTE, 0x11.toByte())
             )
         )
     }
 
-    private fun itemStackMetadataIndex(player: Player): Int {
-        val version = PacketEvents.getAPI().playerManager.getClientVersion(player)
-        // 1.17 起实体 metadata 多了冻结时间，ItemEntity 的物品槽位后移。
-        return if (version.isOlderThan(ClientVersion.V_1_17)) 7 else 8
+    private fun equipmentPacket(entity: DropZoneEntity): WrapperPlayServerEntityEquipment {
+        val packetItem = SpigotConversionUtil.fromBukkitItemStack(entity.itemStack)
+        return WrapperPlayServerEntityEquipment(
+            entity.runtimeEntityId,
+            listOf(
+                Equipment(EquipmentSlot.HELMET, packetItem)
+            )
+        )
     }
 
     private fun send(player: Player, packet: Any) {
