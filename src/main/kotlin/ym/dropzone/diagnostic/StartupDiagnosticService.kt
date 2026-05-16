@@ -1,20 +1,15 @@
 package ym.dropzone.diagnostic
 
+import org.bukkit.ChatColor
 import org.bukkit.plugin.java.JavaPlugin
 import ym.dropzone.config.OutboxConsumeMode
 import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.config.StorageMode
-import ym.dropzone.entity.DropZoneEntityManager
 import ym.dropzone.scheduler.SchedulerProvider
-import ym.dropzone.storage.MysqlStorage
-import ym.dropzone.storage.OutboxStats
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicBoolean
 
 class StartupDiagnosticService(
-    private val plugin: JavaPlugin,
-    private val entityManager: DropZoneEntityManager,
-    private val mysqlStorage: MysqlStorage?
+    private val plugin: JavaPlugin
 ) {
     private val emitted = AtomicBoolean(false)
 
@@ -22,62 +17,19 @@ class StartupDiagnosticService(
         if (!emitted.compareAndSet(false, true)) return
         val protocolLibDetected = plugin.server.pluginManager.getPlugin("ProtocolLib")?.isEnabled == true
         warnDangerousConfig(snapshot, protocolLibDetected)
-
-        val mysqlFuture = if (snapshot.main.stateStorage.mode == StorageMode.MYSQL) {
-            mysqlStorage?.isHealthy()?.exceptionally { error ->
-                warnDiagnosticFailure(snapshot, "MySQL 健康检查", error)
-                false
-            } ?: CompletableFuture.completedFuture(false)
-        } else {
-            CompletableFuture.completedFuture<Boolean?>(null)
-        }
-        val outboxFuture = if (snapshot.main.stateStorage.mode == StorageMode.MYSQL && mysqlStorage != null) {
-            mysqlStorage.outboxStats().exceptionally { error ->
-                warnDiagnosticFailure(snapshot, "发奖队列统计", error)
-                OutboxStats(0, 0, 0, 0)
-            }
-        } else {
-            CompletableFuture.completedFuture(OutboxStats(0, 0, 0, 0))
-        }
-
-        mysqlFuture.thenCombine(outboxFuture) { mysqlHealthy, outbox ->
-            DiagnosticData(mysqlHealthy, outbox, protocolLibDetected)
-        }.whenComplete { data, error ->
-            if (error != null || data == null) {
-                warnDiagnosticFailure(snapshot, "启动诊断", error ?: IllegalStateException("没有诊断数据"))
-                return@whenComplete
-            }
-            logSummary(snapshot, data)
-        }
+        logSummary(snapshot, protocolLibDetected)
     }
 
-    private fun logSummary(snapshot: RuntimeConfigSnapshot, data: DiagnosticData) {
+    private fun logSummary(snapshot: RuntimeConfigSnapshot, protocolLibDetected: Boolean) {
         val main = snapshot.main
-        val mysqlStatus = when (data.mysqlHealthy) {
-            true -> "已连接"
-            false -> "连接失败"
-            null -> "LOCAL_JSON 模式未启用"
-        }
-        plugin.logger.info("===== 启动诊断 =====")
-        plugin.logger.info("插件版本: ${plugin.description.version}")
-        plugin.logger.info("当前启用活动: ${snapshot.activity.id}")
-        plugin.logger.info("存储模式: ${main.stateStorage.mode}")
-        plugin.logger.info("服务器: ${main.server.id} / 分组 ${main.server.group}")
-        plugin.logger.info("跨服同步: ${onOff(main.crossServer.enabled)}")
-        plugin.logger.info("生成模式: ${main.spawn.crossServerMode}")
-        plugin.logger.info("MySQL: $mysqlStatus")
-        plugin.logger.info("本服活跃奖励点: ${entityManager.activeCount()}")
-        plugin.logger.info("发奖队列: 待处理=${data.outbox.pending} 处理中=${data.outbox.processing} 已完成=${data.outbox.done} 失败=${data.outbox.failed}")
-        plugin.logger.info("ProtocolLib: ${if (data.protocolLibDetected) "已检测" else "未检测到"}")
-        plugin.logger.info(
-            "盔甲架参数: 高度偏移=${main.fakeEntity.armorStandYOffset} " +
-                "小型=${main.fakeEntity.armorStandSmall} 标记=${main.fakeEntity.armorStandMarker}"
-        )
-        plugin.logger.info("发奖队列配置: 启用=${main.rewardOutbox.enabled} 消费模式=${main.rewardOutbox.consumeMode}")
-        plugin.logger.info("调试开关: 发包=${main.fakeEntity.debugPackets} 可见盔甲架=${main.fakeEntity.debugVisibleArmorStand}")
-        plugin.logger.info("PlaceholderAPI: ${if (plugin.server.pluginManager.getPlugin("PlaceholderAPI")?.isEnabled == true) "已检测" else "未检测到"}")
-        plugin.logger.info("Folia: ${yesNo(SchedulerProvider.isFolia())}")
-        plugin.logger.info("==============================")
+        plugin.logger.info(color(ChatColor.GOLD, "===== 启动诊断 ====="))
+        plugin.logger.info("插件版本: ${color(ChatColor.AQUA, plugin.description.version)}")
+        plugin.logger.info("当前启用活动: ${color(ChatColor.GREEN, snapshot.activity.id)}")
+        plugin.logger.info("存储模式: ${color(ChatColor.YELLOW, main.stateStorage.mode.name)}")
+        plugin.logger.info("ProtocolLib: ${status(protocolLibDetected)}")
+        plugin.logger.info("PlaceholderAPI: ${status(plugin.server.pluginManager.getPlugin("PlaceholderAPI")?.isEnabled == true)}")
+        plugin.logger.info("Folia: ${status(SchedulerProvider.isFolia())}")
+        plugin.logger.info(color(ChatColor.GOLD, "=============================="))
     }
 
     private fun warnDangerousConfig(snapshot: RuntimeConfigSnapshot, protocolLibDetected: Boolean) {
@@ -102,26 +54,15 @@ class StartupDiagnosticService(
         plugin.logger.warning("启动警告: $message (${context(snapshot)})")
     }
 
-    private fun warnDiagnosticFailure(snapshot: RuntimeConfigSnapshot, phase: String, error: Throwable) {
-        plugin.logger.warning(
-            "启动警告: $phase 失败: ${error.javaClass.simpleName}: ${error.message} " +
-                "(${context(snapshot)}, outbox_id=n/a, spawn_id=n/a, player_uuid=n/a, reward_id=n/a)"
-        )
-    }
-
     private fun context(snapshot: RuntimeConfigSnapshot): String {
         val main = snapshot.main
         return "server.id=${main.server.id}, server.group=${main.server.group}, " +
             "storage.mode=${main.stateStorage.mode}, activity_id=${snapshot.activity.id}"
     }
 
-    private fun onOff(value: Boolean): String = if (value) "开启" else "关闭"
+    private fun status(value: Boolean): String {
+        return if (value) color(ChatColor.GREEN, "已检测") else color(ChatColor.RED, "未检测到")
+    }
 
-    private fun yesNo(value: Boolean): String = if (value) "是" else "否"
-
-    private data class DiagnosticData(
-        val mysqlHealthy: Boolean?,
-        val outbox: OutboxStats,
-        val protocolLibDetected: Boolean
-    )
+    private fun color(color: ChatColor, text: String): String = "$color$text${ChatColor.RESET}"
 }

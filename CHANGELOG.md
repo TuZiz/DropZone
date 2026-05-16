@@ -7,7 +7,7 @@
 ### 新增
 
 - 新增启动时自动诊断日志，只输出到控制台，不发送给玩家。
-- 启动诊断包含插件版本、当前启用活动、存储模式、服务器 ID / 分组、跨服开关、生成模式、MySQL 状态、本服活跃奖励点数量、发奖队列统计、ProtocolLib 状态、盔甲架参数、发奖队列配置、调试开关、PlaceholderAPI 状态和 Folia 状态。
+- 启动诊断包含插件版本、当前启用活动、存储模式、ProtocolLib 状态、PlaceholderAPI 状态和 Folia 状态。
 - 新增危险配置启动警告，覆盖发包调试、可见盔甲架、MySQL 模式关闭发奖队列、`ANY_SERVER` 消费模式、过高活跃奖励点上限、过短生成间隔、同步区块加载、`armor-stand-marker=true`、ProtocolLib 缺失和旧 PacketEvents 配置。
 - 新增 `StartupDiagnosticService`，避免把启动诊断逻辑堆入主类。
 - README 增加单服部署、多服部署、启动诊断、头颅高度调整、旧版本升级和正式服上线检查清单。

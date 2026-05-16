@@ -25,18 +25,9 @@
 [DropZone] 插件版本: 1.0.0-rc.1
 [DropZone] 当前启用活动: default
 [DropZone] 存储模式: MYSQL
-[DropZone] 服务器: survival-1 / 分组 survival
-[DropZone] 跨服同步: 开启
-[DropZone] 生成模式: DATABASE_LOCK
-[DropZone] MySQL: 已连接
-[DropZone] 本服活跃奖励点: 3
-[DropZone] 发奖队列: 待处理=0 处理中=0 已完成=15 失败=0
 [DropZone] ProtocolLib: 已检测
-[DropZone] 盔甲架参数: 高度偏移=-0.85 小型=true 标记=false
-[DropZone] 发奖队列配置: 启用=true 消费模式=CURRENT_SERVER
-[DropZone] 调试开关: 发包=false 可见盔甲架=false
 [DropZone] PlaceholderAPI: 已检测
-[DropZone] Folia: 否
+[DropZone] Folia: 未检测到
 [DropZone] ==============================
 ```
 
@@ -152,7 +143,6 @@ fake-entity:
 
 ## 测试服验收建议
 
-- 启动诊断显示 MySQL 已连接。
 - 启动诊断没有严重警告。
 - `/dz dbstatus` 正常。
 - `/dz spawn` 能生成奖励点。

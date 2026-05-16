@@ -121,7 +121,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
             if (SchedulerProvider.isFolia()) {
                 logger.warning("Folia 模式: 第三方奖励命令可能需要兼容 GLOBAL_SAFE 的命令处理器。")
             }
-            startupDiagnosticService = StartupDiagnosticService(this, entityManager, mysqlStorage).also { it.emit(snapshot) }
+            startupDiagnosticService = StartupDiagnosticService(this).also { it.emit(snapshot) }
             scheduler.runGlobal { startRuntimeTasks() }
         }
     }
