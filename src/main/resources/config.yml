@@ -26,6 +26,10 @@ state-storage:
   # 当前激活活动状态文件。
   active-activity-file: "activity-state.json"
 
+claim:
+  # 领取被拒绝后，临时忽略该玩家的秒数，避免反复靠近刷屏。
+  denied-ignore-seconds: 3
+
 spawn-region:
   # 生成世界名，不存在时本轮生成会跳过。
   world: "world"

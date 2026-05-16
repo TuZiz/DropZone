@@ -1,10 +1,12 @@
 package ym.dropzone.scheduler
 
 import org.bukkit.Location
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import org.bukkit.scheduler.BukkitTask
 import java.util.Collections
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 
 class BukkitSchedulerAdapter(private val plugin: Plugin) : SchedulerAdapter {
@@ -31,6 +33,13 @@ class BukkitSchedulerAdapter(private val plugin: Plugin) : SchedulerAdapter {
     override fun runAt(location: Location, task: () -> Unit): ScheduledTaskHandle = runGlobal(task)
 
     override fun runForPlayer(player: Player, task: () -> Unit): ScheduledTaskHandle = runGlobal(task)
+
+    override fun runForPlayer(playerId: UUID, task: (Player) -> Unit): ScheduledTaskHandle? {
+        val player = Bukkit.getPlayer(playerId) ?: return null
+        return runForPlayer(player) {
+            if (player.isOnline) task(player)
+        }
+    }
 
     override fun <T> callAt(location: Location, task: () -> T): CompletableFuture<T> {
         val future = CompletableFuture<T>()

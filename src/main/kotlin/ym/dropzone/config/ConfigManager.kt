@@ -191,6 +191,9 @@ class ConfigManager(
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
             activityFiles = parseActivityFiles(yaml),
             stateStorage = parseStateStorage(yaml),
+            claim = ClaimConfig(
+                deniedIgnoreSeconds = yaml.getLong("claim.denied-ignore-seconds", 3L).coerceAtLeast(1L)
+            ),
             spawnRegion = SpawnRegionConfig(
                 world = yaml.getString("spawn-region.world", "world") ?: "world",
                 mode = regionMode ?: SpawnRegionMode.MAX_RADIUS,

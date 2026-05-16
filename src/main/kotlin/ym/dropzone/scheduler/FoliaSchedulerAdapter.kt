@@ -1,9 +1,11 @@
 package ym.dropzone.scheduler
 
 import org.bukkit.Location
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import java.util.Collections
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -49,6 +51,13 @@ class FoliaSchedulerAdapter(private val plugin: Plugin) : SchedulerAdapter {
             "run",
             arrayOf(plugin, consumer(task), null)
         )
+    }
+
+    override fun runForPlayer(playerId: UUID, task: (Player) -> Unit): ScheduledTaskHandle? {
+        val player = Bukkit.getPlayer(playerId) ?: return null
+        return runForPlayer(player) {
+            if (player.isOnline) task(player)
+        }
     }
 
     override fun <T> callAt(location: Location, task: () -> T): CompletableFuture<T> {

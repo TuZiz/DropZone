@@ -3,6 +3,7 @@ package ym.dropzone.scheduler
 import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 
 // 统一调度入口：业务层不关心当前是 Bukkit 主线程模型还是 Folia region 模型。
@@ -15,6 +16,7 @@ interface SchedulerAdapter {
     fun runGlobalTimer(delayTicks: Long, periodTicks: Long, task: () -> Unit): ScheduledTaskHandle
     fun runAt(location: Location, task: () -> Unit): ScheduledTaskHandle
     fun runForPlayer(player: Player, task: () -> Unit): ScheduledTaskHandle
+    fun runForPlayer(playerId: UUID, task: (Player) -> Unit): ScheduledTaskHandle?
     fun <T> callAt(location: Location, task: () -> T): CompletableFuture<T>
     fun cancelAll()
 }

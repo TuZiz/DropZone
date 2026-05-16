@@ -3,6 +3,7 @@ package ym.dropzone
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerChangedWorldEvent
+import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
 import ym.dropzone.claim.ClaimTracker
@@ -68,6 +69,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
         )
 
         server.pluginManager.registerEvents(this, this)
+        server.onlinePlayers.forEach { playerSnapshots.track(it.uniqueId) }
         getCommand("dropzone")?.setExecutor(
             DropZoneCommand(configManager, scheduler, entityManager, locationService, langService, placeholderService, claimTracker) { restartRuntimeTasks() }
         )
@@ -80,6 +82,10 @@ class DropZonePlugin : JavaPlugin(), Listener {
                 return@whenComplete
             }
             snapshot.warnings.forEach { logger.warning(it) }
+            logger.info(
+                "DropZone loaded: activity=${snapshot.activity.id}, spawn=${snapshot.main.spawn.enabled}, " +
+                    "maxActive=${snapshot.main.spawn.maxActive}, rewardCommand=${snapshot.main.rewardCommandExecutorMode}"
+            )
             scheduler.runGlobal { startRuntimeTasks() }
         }
     }
@@ -96,8 +102,13 @@ class DropZonePlugin : JavaPlugin(), Listener {
     }
 
     @EventHandler
+    fun onJoin(event: PlayerJoinEvent) {
+        if (::playerSnapshots.isInitialized) playerSnapshots.track(event.player.uniqueId)
+    }
+
+    @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
-        if (::playerSnapshots.isInitialized) playerSnapshots.remove(event.player.uniqueId)
+        if (::playerSnapshots.isInitialized) playerSnapshots.untrack(event.player.uniqueId)
         if (::entityManager.isInitialized) entityManager.handleQuit(event.player)
     }
 
@@ -105,6 +116,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
     fun onWorldChange(event: PlayerChangedWorldEvent) {
         if (::playerSnapshots.isInitialized) playerSnapshots.remove(event.player.uniqueId)
         if (::entityManager.isInitialized) entityManager.handleQuit(event.player)
+        if (::playerSnapshots.isInitialized) playerSnapshots.track(event.player.uniqueId)
     }
 
     private fun restartRuntimeTasks() {
@@ -116,7 +128,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
     private fun startRuntimeTasks() {
         val snapshot = configManager.snapshot ?: return
         val interval = snapshot.main.fakeEntity.updateIntervalTicks
-        runningTasks += scheduler.runGlobalTimer(1L, interval, PlayerSnapshotTask(server, playerSnapshots)::run)
+        runningTasks += scheduler.runGlobalTimer(1L, interval, PlayerSnapshotTask(playerSnapshots)::run)
         runningTasks += scheduler.runGlobalTimer(1L, interval, EntityTickTask(entityManager)::run)
         runningTasks += scheduler.runGlobalTimer(1L, interval, ViewerUpdateTask(entityManager)::run)
         if (snapshot.main.spawn.enabled) {

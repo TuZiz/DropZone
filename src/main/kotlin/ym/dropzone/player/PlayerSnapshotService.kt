@@ -1,6 +1,5 @@
 package ym.dropzone.player
 
-import org.bukkit.entity.Player
 import ym.dropzone.scheduler.SchedulerAdapter
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -26,12 +25,22 @@ class PlayerSnapshotService(
     private val scheduler: SchedulerAdapter
 ) {
     private val snapshots = ConcurrentHashMap<UUID, PlayerPositionSnapshot>()
+    private val trackedPlayers = ConcurrentHashMap.newKeySet<UUID>()
 
-    fun refresh(players: Collection<Player>) {
-        players.forEach { player ->
-            scheduler.runForPlayer(player) {
+    fun track(uuid: UUID) {
+        trackedPlayers += uuid
+    }
+
+    fun untrack(uuid: UUID) {
+        trackedPlayers.remove(uuid)
+        remove(uuid)
+    }
+
+    fun refreshTracked() {
+        trackedPlayers.toList().forEach { playerId ->
+            scheduler.runForPlayer(playerId) { player ->
                 if (!player.isOnline) {
-                    remove(player.uniqueId)
+                    untrack(playerId)
                     return@runForPlayer
                 }
                 val location = player.location
@@ -44,7 +53,7 @@ class PlayerSnapshotService(
                     z = location.z,
                     capturedAtMillis = System.currentTimeMillis()
                 )
-            }
+            } ?: untrack(playerId)
         }
     }
 
@@ -59,6 +68,7 @@ class PlayerSnapshotService(
     fun get(uuid: UUID): PlayerPositionSnapshot? = snapshots[uuid]
 
     fun clear() {
+        trackedPlayers.clear()
         snapshots.clear()
     }
 }

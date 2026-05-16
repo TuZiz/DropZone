@@ -1,27 +1,31 @@
 # DropZone
 
-DropZone 是一个 Kotlin + Maven 编写的 Minecraft 插件。插件通过 PacketEvents 给玩家发送客户端假物品实体，不生成真实掉落物，不使用 ProtocolLib、NMS、ArmorStand 或 Display Entity 主实现。奖励点显示为带自定义皮肤的玩家头颅，玩家靠近后会平滑吸附并通过控制台命令发奖。
+DropZone 是一个 Minecraft 奖励点插件。它会在配置区域内随机生成客户端可见的假头颅奖励点，玩家靠近后头颅会飞向玩家，领取后通过控制台命令发放奖励。
+
+插件使用 PacketEvents 显示假物品实体，不生成真实掉落物，不使用 ProtocolLib、NMS、ArmorStand 或 Display Entity。
 
 ## 功能
 
-- PacketEvents 假 Item Entity，服务端没有真实掉落实体。
-- `config.yml` 配置生成范围、视距、吸附、过期、效果、重载策略、活动资源路径和数据存储路径。
-- `action/<活动名>/config.yml` 配置活动显示名、启用状态、清理策略和领取限制。
-- `action/<活动名>/heads.yml` 配置头颅 id、MiniMessage 名字、lore、base64 texture、稀有度和权重。
-- `action/<活动名>/rewards.yml` 配置稀有度、抽取占比、公告、发光和奖励命令。
-- `lang/zh_cn.yml` 管理玩家、管理员和控制台可见文本，全部使用 MiniMessage RGB/Hex 颜色。
-- `/dz reload` 异步读取和解析 YAML，运行时只读取不可变配置快照。
-- `/dz start <活动名>` 激活指定 `action/<活动名>/` 活动，当前活动默认写入本地 JSON。
-- 兼容 Spigot / Paper / Purpur，并通过调度适配器兼容 Folia。
+- 随机生成自定义皮肤头颅奖励点。
+- 支持 `MAX_RADIUS` 和 `BOX` 两种生成区域。
+- 支持生成高度、区块加载策略、地面/空气/水/岩浆检查。
+- 玩家进入可视距离后显示假实体。
+- 玩家进入吸附距离后头颅平滑飞向玩家。
+- 领取后自动销毁假实体并执行奖励命令。
+- 支持稀有度、权重、公告和头颅发光。
+- 支持多个活动目录，通过 `/dz start <活动名>` 切换活动。
+- 支持领取次数限制、领取冷却、禁止重复获得同一奖励。
+- 支持音效、粒子、Title、ActionBar。
+- 支持 PlaceholderAPI 变量。
+- 支持 Spigot / Paper / Purpur / Folia。
 
 ## 安装
 
-1. 执行 `mvn clean package`。
-2. 将 `target/DropZone-1.0.0.jar` 放入服务器 `plugins/`。
-3. 将 PacketEvents 插件 jar 单独放入服务器 `plugins/`。
-4. 启动服务器生成默认配置。
-5. 默认 `action/default/heads.yml` 已内置可用 base64 材质；需要换皮肤时替换对应 `texture`。
-6. 执行 `/dz reload` 异步重载配置。
+1. 将 `DropZone-1.0.0.jar` 放入服务器 `plugins/` 目录。
+2. 将 PacketEvents 插件也放入服务器 `plugins/` 目录。
+3. 启动服务器生成默认配置。
+4. 修改 `config.yml` 和 `action/default/` 下的活动文件。
+5. 执行 `/dz reload` 重载配置。
 
 ## 构建
 
@@ -29,139 +33,161 @@ DropZone 是一个 Kotlin + Maven 编写的 Minecraft 插件。插件通过 Pack
 mvn clean package
 ```
 
-当前项目通过 CodeMC 远程仓库解析 PacketEvents 编译依赖。DropZone 是薄包，不 shade PacketEvents、Kotlin 或 Adventure；运行时仍需要在服务器 `plugins/` 中单独安装 PacketEvents，Kotlin 与 Adventure 由 `plugin.yml libraries` 加载。
+构建产物在：
 
-## 兼容说明
-
-- Java 目标字节码：17。
-- Bukkit API：Spigot `1.16.5-R0.1-SNAPSHOT`，运行目标为 1.16+。
-- Folia：`SchedulerAdapter` 自动检测 `io.papermc.paper.threadedregions.RegionizedServer`，业务层不直接调用 BukkitScheduler。
+```text
+target/DropZone-1.0.0.jar
+```
 
 ## 配置文件
 
-- `config.yml`：全局玩法参数、活动资源目录、当前活动状态存储路径。
-- `action/default/config.yml`：活动名、启用状态、清理策略和领取限制。
-- `action/default/heads.yml`：头颅外观和稀有度绑定。
-- `action/default/rewards.yml`：稀有度权重与奖励命令。
-- `lang/zh_cn.yml`：玩家消息、管理员消息、列表和 debug 文本。
+```text
+plugins/DropZone/config.yml
+plugins/DropZone/lang/zh_cn.yml
+plugins/DropZone/action/default/config.yml
+plugins/DropZone/action/default/heads.yml
+plugins/DropZone/action/default/rewards.yml
+```
 
-`reward-command.executor` 可选：
-
-- `PLAYER_REGION`：默认，在领取玩家调度上下文执行控制台命令。
-- `GLOBAL`：在全局调度上下文执行控制台命令，适合部分只操作全局数据的第三方命令。
+- `config.yml`：全局生成范围、吸附距离、奖励点表现、效果和运行策略。
+- `lang/zh_cn.yml`：所有玩家可见消息。
+- `action/<活动名>/config.yml`：活动开关和领取规则。
+- `action/<活动名>/heads.yml`：头颅材质、显示名、lore、稀有度和权重。
+- `action/<活动名>/rewards.yml`：稀有度、奖励权重、公告和奖励命令。
 
 ## 活动目录
 
-每个 `action/<活动名>/` 都是一套独立活动，至少包含：
+每个活动都是一个独立文件夹：
 
 ```text
-config.yml
-heads.yml
-rewards.yml
+action/default/
+  config.yml
+  heads.yml
+  rewards.yml
 ```
 
-使用命令激活活动：
+新增活动时复制 `default` 文件夹并改名，例如：
 
 ```text
-/dz start default
+action/summer/
 ```
 
-活动目录只放资源配置，不做运行数据存储。当前激活活动默认写入：
+然后使用：
 
 ```text
-plugins/DropZone/data/activity-state.json
+/dz start summer
 ```
-
-默认存储模式是 `LOCAL_JSON`。后续要做多服同步时，可以在 `ym.dropzone.storage.ActivityStateStore` 接口下替换为 Redis、MySQL 或消息总线实现。活动根目录、默认活动名、活动配置文件名、heads/rewards 文件名在根 `config.yml` 的 `action` 节点配置；活动状态 JSON 路径在根 `config.yml` 的 `state-storage` 节点配置。
-
-## 头颅材质
-
-活动目录内 `heads.yml` 的 `texture` 填入 Minecraft 皮肤材质 base64。默认文件已配置星星、末影水晶、魔方、宝箱、龙五个可用材质。如果仍写成 `CHANGE_ME_BASE64_TEXTURE`，插件会跳过该头颅并在控制台警告。
 
 ## 命令
 
-- `/dropzone reload` 或 `/dz reload`：异步重载配置。
-- `/dropzone start <活动名>`：激活指定活动。
-- `/dropzone spawn`：手动生成一个奖励点。
-- `/dropzone clear`：清理所有假实体。
-- `/dropzone list`：列出活跃奖励点。
-- `/dropzone debug`：显示运行状态。
+```text
+/dropzone reload
+/dropzone start <活动名>
+/dropzone spawn
+/dropzone clear
+/dropzone list
+/dropzone debug
+```
 
-## PlaceholderAPI 变量
+别名：
 
-服务器安装 PlaceholderAPI 后，DropZone 会自动注册 `%dropzone_*%` 变量；未安装 PlaceholderAPI 时插件正常运行。
-
-- `%dropzone_loaded%`：配置快照是否已加载，`1` 或 `0`。
-- `%dropzone_status%`：当前活动状态，`enabled`、`disabled` 或 `loading`。
-- `%dropzone_activity%`：当前活动 id。
-- `%dropzone_activity_name%`：当前活动显示名，已转为纯文本。
-- `%dropzone_activity_name_raw%`：当前活动显示名，保留 MiniMessage。
-- `%dropzone_activity_enabled%`：当前活动是否启用。
-- `%dropzone_active%` / `%dropzone_active_count%`：当前活跃奖励点数量。
-- `%dropzone_max_active%`：配置允许的最大活跃奖励点数量。
-- `%dropzone_remaining_slots%`：还能生成的奖励点数量。
-- `%dropzone_spawn_enabled%`：自动生成是否启用。
-- `%dropzone_spawn_interval_seconds%`：自动生成间隔秒数。
-- `%dropzone_despawn_seconds%`：奖励点过期秒数。
-- `%dropzone_world%`：配置的生成世界。
-- `%dropzone_selection_mode%`：奖励抽取模式。
-- `%dropzone_language%`：当前语言配置。
-- `%dropzone_rarity_count%` / `%dropzone_rarities%`：稀有度数量。
-- `%dropzone_usable_rarity_count%` / `%dropzone_usable_rarities%`：可参与抽取的稀有度数量。
-- `%dropzone_head_count%` / `%dropzone_heads%`：可用头颅数量。
-- `%dropzone_reward_count%` / `%dropzone_rewards%`：奖励数量。
-- `%dropzone_activity_count%` / `%dropzone_activities%`：可识别活动目录数量。
-- `%dropzone_view_distance%`：假实体可视距离。
-- `%dropzone_attract_distance%`：吸附距离。
-- `%dropzone_pickup_distance%`：领取距离。
-
-玩家相关最近奖励点变量：
-
-- `%dropzone_nearest_id%`
-- `%dropzone_nearest_state%`
-- `%dropzone_nearest_distance%`
-- `%dropzone_nearest_world%`
-- `%dropzone_nearest_x%`
-- `%dropzone_nearest_y%`
-- `%dropzone_nearest_z%`
-- `%dropzone_nearest_reward%`
-- `%dropzone_nearest_reward_raw%`
-- `%dropzone_nearest_reward_id%`
-- `%dropzone_nearest_rarity%`
-- `%dropzone_nearest_rarity_raw%`
-- `%dropzone_nearest_rarity_id%`
-- `%dropzone_nearest_head%`
-- `%dropzone_nearest_head_raw%`
-- `%dropzone_nearest_head_id%`
-- `%dropzone_nearest_visible%`
-- `%dropzone_nearest_attractable%`
+```text
+/dz
+```
 
 ## 权限
 
-- `dropzone.admin`
-- `dropzone.reload`
-- `dropzone.start`
-- `dropzone.spawn`
-- `dropzone.clear`
-- `dropzone.list`
-- `dropzone.debug`
+```text
+dropzone.admin
+dropzone.reload
+dropzone.start
+dropzone.spawn
+dropzone.clear
+dropzone.list
+dropzone.debug
+```
+
+## PlaceholderAPI
+
+安装 PlaceholderAPI 后可使用 `%dropzone_*%` 变量。
+
+常用变量：
+
+```text
+%dropzone_loaded%
+%dropzone_status%
+%dropzone_activity%
+%dropzone_activity_name%
+%dropzone_active_count%
+%dropzone_max_active%
+%dropzone_remaining_slots%
+%dropzone_spawn_enabled%
+%dropzone_rarity_count%
+%dropzone_head_count%
+%dropzone_reward_count%
+%dropzone_nearest_distance%
+%dropzone_nearest_reward%
+%dropzone_nearest_rarity%
+%dropzone_nearest_head%
+```
+
+## 奖励命令变量
+
+奖励命令和消息支持：
+
+```text
+%player%
+%uuid%
+%reward_id%
+%reward%
+%rarity_id%
+%rarity%
+%head_id%
+%head%
+%x%
+%y%
+%z%
+%world%
+%prefix%
+```
+
+示例：
+
+```yaml
+commands:
+  - "eco give %player% 100"
+  - "give %player% diamond 3"
+```
+
+## 头颅材质
+
+`heads.yml` 中的 `texture` 使用 Minecraft 头颅 base64 材质。默认配置已包含可用示例材质，可以直接运行测试。
+
+如果材质仍是 `CHANGE_ME_BASE64_TEXTURE`，该头颅会被跳过。
+
+## 领取规则
+
+活动配置支持：
+
+```yaml
+rules:
+  clear-active-on-start: true
+  max-claims-per-player: 0
+  claim-cooldown-seconds: 0
+  allow-repeat-rewards: true
+```
+
+- `max-claims-per-player: 0` 表示不限制领取次数。
+- `claim-cooldown-seconds: 0` 表示不限制领取冷却。
+- `allow-repeat-rewards: false` 表示同一活动中同一玩家不能重复获得同一个 reward id。
 
 ## 常见问题
 
 **看不到头颅怎么办？**  
-确认服务器已安装 PacketEvents，当前活动目录内 `heads.yml` 的材质不是 `CHANGE_ME_BASE64_TEXTURE`，玩家与奖励点在同一世界且距离小于 `fake-entity.view-distance`。
-
-**头颅不飞向玩家怎么办？**  
-检查 `fake-entity.attract-distance` 和 `pickup-distance`，并确认玩家与奖励点同世界。
+确认服务器已安装 PacketEvents，并确认玩家和奖励点在同一世界且距离小于 `fake-entity.view-distance`。
 
 **奖励命令不执行怎么办？**  
-命令由控制台执行，不要在配置中写 `/`。同时确认对应经济、抽奖箱等外部命令插件已安装。
-
-**自定义头颅材质不显示怎么办？**  
-确认 base64 内容有效。头颅 profile 适配逻辑集中在 `ym.dropzone.util.SkullTextureUtil`。
-
-**Folia 下报错怎么办？**  
-确认服务端版本支持 Folia 调度 API，并检查报错是否来自第三方奖励命令。DropZone 自身通过 `SchedulerAdapter` 避免全局主线程假设。
+奖励命令由控制台执行，配置中不要写开头的 `/`。同时确认经济、抽奖箱等第三方命令插件已安装。
 
 **reload 会不会卡服？**  
-不会。YAML 文件读取、解析、校验和权重数据构建都在异步调度中完成，完成后再原子替换运行时快照。
+不会。配置文件读取、解析和校验走异步流程，运行时逻辑只读取内存快照。

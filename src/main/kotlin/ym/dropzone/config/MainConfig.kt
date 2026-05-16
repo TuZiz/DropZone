@@ -5,6 +5,7 @@ data class MainConfig(
     val language: String,
     val activityFiles: ActivityFilesConfig,
     val stateStorage: StateStorageConfig,
+    val claim: ClaimConfig,
     val spawnRegion: SpawnRegionConfig,
     val locationRules: LocationRulesConfig,
     val rewardSelectionMode: RewardSelectionMode,
@@ -27,6 +28,10 @@ data class StateStorageConfig(
     val mode: String,
     val folder: String,
     val activeActivityFile: String
+)
+
+data class ClaimConfig(
+    val deniedIgnoreSeconds: Long
 )
 
 enum class RewardSelectionMode {

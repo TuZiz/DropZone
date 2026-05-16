@@ -1,6 +1,5 @@
 package ym.dropzone.entity
 
-import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
@@ -135,12 +134,10 @@ class DropZoneEntityManager(
         val dz = target.z - current.z
         val distance = sqrt(dx * dx + dy * dy + dz * dz)
         if (distance <= fake.pickupDistance && entity.markClaiming()) {
-            val player = Bukkit.getPlayer(target.uuid)
-            if (player == null) {
+            val handle = scheduler.runForPlayer(target.uuid) { player -> claim(entity, player, snapshot) }
+            if (handle == null) {
                 entity.releaseClaiming()
                 entity.lockedPlayer = null
-            } else {
-                scheduler.runForPlayer(player) { claim(entity, player, snapshot) }
             }
             return
         }
@@ -202,7 +199,7 @@ class DropZoneEntityManager(
             ClaimDenyReason.REPEAT_REWARD -> LangKeys.CLAIM_DENIED_REPEAT_REWARD
             null -> LangKeys.CLAIM_DENIED_MAX_CLAIMS
         }
-        entity.ignoredUntil[player.uniqueId] = System.currentTimeMillis() + 3000L
+        entity.ignoredUntil[player.uniqueId] = System.currentTimeMillis() + snapshot.main.claim.deniedIgnoreSeconds * 1000L
         entity.lockedPlayer = null
         entity.releaseClaiming()
         val values = placeholderService.build(snapshot.lang, player, entity.roll, entity.currentLocation, mapOf("seconds" to seconds.toString()))
@@ -210,9 +207,8 @@ class DropZoneEntityManager(
     }
 
     private fun showOrUpdate(playerId: UUID, entity: DropZoneEntity) {
-        val player = Bukkit.getPlayer(playerId) ?: return
         val firstView = entity.visibleTo.add(playerId)
-        scheduler.runForPlayer(player) {
+        val handle = scheduler.runForPlayer(playerId) { player ->
             if (!player.isOnline || !entities.containsKey(entity.id)) {
                 entity.visibleTo.remove(playerId)
                 return@runForPlayer
@@ -223,6 +219,7 @@ class DropZoneEntityManager(
                 packetAdapter.updateEntity(player, entity)
             }
         }
+        if (handle == null) entity.visibleTo.remove(playerId)
     }
 
     private fun hideViewer(playerId: UUID, entity: DropZoneEntity) {
@@ -240,8 +237,7 @@ class DropZoneEntityManager(
     }
 
     private fun destroyForViewer(playerId: UUID, entityId: Int) {
-        val player = Bukkit.getPlayer(playerId) ?: return
-        scheduler.runForPlayer(player) {
+        scheduler.runForPlayer(playerId) { player ->
             if (player.isOnline) {
                 packetAdapter.destroyEntity(player, entityId)
             }

@@ -1,6 +1,5 @@
 package ym.dropzone.task
 
-import org.bukkit.Server
 import ym.dropzone.config.ConfigManager
 import ym.dropzone.entity.DropZoneEntityManager
 import ym.dropzone.player.PlayerSnapshotService
@@ -8,11 +7,10 @@ import ym.dropzone.region.RandomLocationService
 import ym.dropzone.scheduler.SchedulerAdapter
 
 class PlayerSnapshotTask(
-    private val server: Server,
     private val snapshots: PlayerSnapshotService
 ) : Runnable {
     override fun run() {
-        snapshots.refresh(server.onlinePlayers)
+        snapshots.refreshTracked()
     }
 }
 
