@@ -8,7 +8,6 @@ import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import ym.dropzone.config.LangConfig
 import ym.dropzone.util.MiniMessageUtil
-import ym.dropzone.util.PlainTextUtil
 import java.time.Duration
 
 // 所有对玩家和命令发送者可见的文本都从 LangConfig 读取并用 MiniMessage 渲染。
@@ -26,13 +25,17 @@ class LangService(plugin: Plugin, private val placeholders: PlaceholderService) 
         players.forEach { audiences.player(it).sendMessage(component) }
     }
 
-    fun actionBar(player: Player, lang: LangConfig, key: String, values: Map<String, String>) {
+    fun actionBar(player: Player, lang: LangConfig, key: String, values: Map<String, String> = emptyMap()) {
         val raw = lang.messages[key] ?: return
         val rendered = placeholders.apply(raw, values)
         val component = MiniMessageUtil.deserialize(rendered)
-        runCatching {
+
+        val adventureSuccess = runCatching {
             audiences.player(player).sendActionBar(component)
-        }
+        }.isSuccess
+
+        if (adventureSuccess) return
+
         sendSpigotActionBar(player, rendered)
     }
 
@@ -72,8 +75,6 @@ class LangService(plugin: Plugin, private val placeholders: PlaceholderService) 
                     method.parameterTypes[1].componentType == baseComponent
             } ?: return@runCatching
             sendMessage.invoke(spigot, actionBar, components)
-        }.recoverCatching {
-            player.sendMessage(PlainTextUtil.stripMiniMessage(rendered))
         }
     }
 }
