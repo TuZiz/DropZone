@@ -56,20 +56,33 @@ class DropZoneCommand(
                     log(sender, configManager.lang, LangKeys.CONSOLE_RELOAD_FAILED, "error" to (error?.message ?: activityName))
                     return@runGlobal
                 }
-                if (snapshot.activity.rules.clearActiveOnStart) {
-                    entityManager.clearAllPersistent(snapshot)
+                val afterClear = {
                     claimTracker.clearActivity(snapshot.activity.id)
+                    restartTasks()
+                    triggerSpawnCycle(snapshot)
+                    val values = placeholderService.build(
+                        snapshot.lang,
+                        null,
+                        null,
+                        null,
+                        mapOf("activity" to snapshot.activity.id, "activity_display" to snapshot.activity.displayName)
+                    )
+                    langService.send(sender, snapshot.lang, LangKeys.ADMIN_START_SUCCESS, values)
                 }
-                restartTasks()
-                triggerSpawnCycle(snapshot)
-                val values = placeholderService.build(
-                    snapshot.lang,
-                    null,
-                    null,
-                    null,
-                    mapOf("activity" to snapshot.activity.id, "activity_display" to snapshot.activity.displayName)
-                )
-                langService.send(sender, snapshot.lang, LangKeys.ADMIN_START_SUCCESS, values)
+                if (snapshot.activity.rules.clearActiveOnStart) {
+                    entityManager.clearAllPersistent(snapshot).whenComplete { _, clearError ->
+                        scheduler.runGlobal {
+                            if (clearError != null) {
+                                sendKey(sender, LangKeys.ADMIN_START_FAILED)
+                                log(sender, snapshot.lang, LangKeys.CONSOLE_RELOAD_FAILED, "error" to (clearError.message ?: clearError.javaClass.simpleName))
+                            } else {
+                                afterClear()
+                            }
+                        }
+                    }
+                } else {
+                    afterClear()
+                }
             }
         }
     }
@@ -85,11 +98,26 @@ class DropZoneCommand(
                     error?.let { log(sender, oldLang, LangKeys.CONSOLE_RELOAD_FAILED, "error" to (it.message ?: it.javaClass.simpleName)) }
                     return@runGlobal
                 }
-                if (snapshot.main.reload.clearActiveEntities) entityManager.clearAllPersistent(snapshot)
-                restartTasks()
-                if (mysqlStorage != null) entityManager.syncFromDatabase(snapshot)
-                snapshot.warnings.forEach { sender.server.logger.warning(it) }
-                langService.send(sender, snapshot.lang, LangKeys.RELOAD_SUCCESS, placeholderService.build(snapshot.lang, null, null, null))
+                val afterClear = {
+                    restartTasks()
+                    if (mysqlStorage != null) entityManager.syncFromDatabase(snapshot)
+                    snapshot.warnings.forEach { sender.server.logger.warning(it) }
+                    langService.send(sender, snapshot.lang, LangKeys.RELOAD_SUCCESS, placeholderService.build(snapshot.lang, null, null, null))
+                }
+                if (snapshot.main.reload.clearActiveEntities) {
+                    entityManager.clearAllPersistent(snapshot).whenComplete { _, clearError ->
+                        scheduler.runGlobal {
+                            if (clearError != null) {
+                                oldLang?.let { langService.send(sender, it, LangKeys.RELOAD_FAILED, placeholderService.build(it, null, null, null)) }
+                                log(sender, snapshot.lang, LangKeys.CONSOLE_RELOAD_FAILED, "error" to (clearError.message ?: clearError.javaClass.simpleName))
+                            } else {
+                                afterClear()
+                            }
+                        }
+                    }
+                } else {
+                    afterClear()
+                }
             }
         }
     }

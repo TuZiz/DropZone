@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import ym.dropzone.config.MysqlConfig
+import ym.dropzone.config.OutboxConsumeMode
 import ym.dropzone.config.ServerConfig
 import java.sql.Connection
 import java.sql.ResultSet
@@ -39,7 +40,6 @@ class MysqlStorage(
             connectionTimeout = mysql.connectionTimeoutMs
             maxLifetime = mysql.maxLifetimeMs
             poolName = "DropZone-Hikari"
-            driverClassName = "com.mysql.cj.jdbc.Driver"
         }
         dataSource = HikariDataSource(config)
     }
@@ -250,21 +250,52 @@ class MysqlStorage(
         }
     }
 
-    fun claimOutboxBatch(limit: Int): CompletableFuture<List<RewardOutboxEntry>> = async {
+    fun restoreStaleProcessing(processingTimeoutSeconds: Long): CompletableFuture<Int> = async {
+        val now = System.currentTimeMillis()
+        val cutoff = now - processingTimeoutSeconds.coerceAtLeast(5L) * 1000L
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(
+                """
+                UPDATE dropzone_reward_outbox
+                SET status = IF(attempt_count >= max_attempts, 'FAILED', 'PENDING'),
+                    last_error = IF(attempt_count >= max_attempts, 'processing timeout exceeded max attempts', last_error),
+                    updated_at = ?
+                WHERE status = 'PROCESSING' AND updated_at < ?
+                """.trimIndent()
+            ).use {
+                it.setLong(1, now)
+                it.setLong(2, cutoff)
+                it.executeUpdate()
+            }
+        }
+    }
+
+    fun claimOutboxBatch(limit: Int, consumeMode: OutboxConsumeMode): CompletableFuture<List<RewardOutboxEntry>> = async {
         dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
                 val ids = mutableListOf<Long>()
+                val consumeClause = when (consumeMode) {
+                    OutboxConsumeMode.CURRENT_SERVER -> " AND server_id = ?"
+                    OutboxConsumeMode.SAME_GROUP -> " AND server_group = ?"
+                    OutboxConsumeMode.ANY_SERVER -> ""
+                }
                 connection.prepareStatement(
                     """
                     SELECT id FROM dropzone_reward_outbox
-                    WHERE status = 'PENDING'
+                    WHERE status = 'PENDING'$consumeClause
                     ORDER BY created_at ASC
                     LIMIT ?
                     FOR UPDATE
                     """.trimIndent()
                 ).use { statement ->
-                    statement.setInt(1, limit)
+                    var index = 1
+                    when (consumeMode) {
+                        OutboxConsumeMode.CURRENT_SERVER -> statement.setString(index++, server.id)
+                        OutboxConsumeMode.SAME_GROUP -> statement.setString(index++, server.group)
+                        OutboxConsumeMode.ANY_SERVER -> Unit
+                    }
+                    statement.setInt(index, limit)
                     statement.executeQuery().use { rs -> while (rs.next()) ids += rs.getLong("id") }
                 }
                 val entries = ids.mapNotNull { id ->
@@ -356,10 +387,22 @@ class MysqlStorage(
         connection.createStatement().use { statement ->
             statements().forEach(statement::executeUpdate)
         }
+        ensureColumn(connection, "dropzone_reward_outbox", "server_group", "ALTER TABLE dropzone_reward_outbox ADD COLUMN server_group VARCHAR(128) NULL AFTER activity_id")
+        connection.createStatement().use { statement ->
+            statement.executeUpdate(
+                """
+                UPDATE dropzone_reward_outbox o
+                JOIN dropzone_spawn_points s ON s.id = o.spawn_id
+                SET o.server_group = s.server_group
+                WHERE o.server_group IS NULL
+                """.trimIndent()
+            )
+            statement.executeUpdate("UPDATE dropzone_reward_outbox SET server_group = '${escapeSql(server.group)}' WHERE server_group IS NULL")
+        }
         connection.prepareStatement(
             """
             INSERT INTO dropzone_schema_version(id, version, updated_at)
-            VALUES (1, 1, ?)
+            VALUES (1, 2, ?)
             ON DUPLICATE KEY UPDATE version = GREATEST(version, VALUES(version)), updated_at = VALUES(updated_at)
             """.trimIndent()
         ).use {
@@ -367,6 +410,16 @@ class MysqlStorage(
             it.executeUpdate()
         }
     }
+
+    private fun ensureColumn(connection: Connection, table: String, column: String, alterSql: String) {
+        connection.metaData.getColumns(connection.catalog, null, table, column).use { columns ->
+            if (!columns.next()) {
+                connection.createStatement().use { it.executeUpdate(alterSql) }
+            }
+        }
+    }
+
+    private fun escapeSql(value: String): String = value.replace("'", "''")
 
     private fun statements(): List<String> = listOf(
         "CREATE TABLE IF NOT EXISTS dropzone_schema_version(id INT PRIMARY KEY, version INT NOT NULL, updated_at BIGINT NOT NULL)",
@@ -426,6 +479,7 @@ class MysqlStorage(
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             spawn_id VARCHAR(64) NOT NULL,
             activity_id VARCHAR(128) NOT NULL,
+            server_group VARCHAR(128) NOT NULL,
             player_uuid VARCHAR(64) NOT NULL,
             player_name VARCHAR(32) NOT NULL,
             reward_id VARCHAR(128) NOT NULL,
@@ -440,6 +494,8 @@ class MysqlStorage(
             updated_at BIGINT NOT NULL,
             done_at BIGINT,
             INDEX idx_status_created(status, created_at),
+            INDEX idx_group_status(server_group, status, created_at),
+            INDEX idx_server_status(server_id, status, created_at),
             INDEX idx_player_uuid(player_uuid),
             INDEX idx_spawn_id(spawn_id)
         )
@@ -526,23 +582,24 @@ class MysqlStorage(
         connection.prepareStatement(
             """
             INSERT INTO dropzone_reward_outbox(
-                spawn_id, activity_id, player_uuid, player_name, reward_id, rarity_id, server_id,
+                spawn_id, activity_id, server_group, player_uuid, player_name, reward_id, rarity_id, server_id,
                 commands_json, status, attempt_count, max_attempts, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?)
             """.trimIndent(),
             Statement.RETURN_GENERATED_KEYS
         ).use {
             it.setString(1, request.spawnId.toString())
             it.setString(2, request.activityId)
-            it.setString(3, request.playerUuid.toString())
-            it.setString(4, request.playerName.take(32))
-            it.setString(5, request.rewardId)
-            it.setString(6, request.rarityId)
-            it.setString(7, request.serverId)
-            it.setString(8, gson.toJson(request.commands))
-            it.setInt(9, request.maxAttempts)
-            it.setLong(10, request.now)
+            it.setString(3, request.serverGroup)
+            it.setString(4, request.playerUuid.toString())
+            it.setString(5, request.playerName.take(32))
+            it.setString(6, request.rewardId)
+            it.setString(7, request.rarityId)
+            it.setString(8, request.serverId)
+            it.setString(9, gson.toJson(request.commands))
+            it.setInt(10, request.maxAttempts)
             it.setLong(11, request.now)
+            it.setLong(12, request.now)
             it.executeUpdate()
             it.generatedKeys.use { keys -> return if (keys.next()) keys.getLong(1) else 0L }
         }
@@ -592,6 +649,7 @@ class MysqlStorage(
                     id = rs.getLong("id"),
                     spawnId = rs.getString("spawn_id"),
                     activityId = rs.getString("activity_id"),
+                    serverGroup = rs.getString("server_group"),
                     playerUuid = UUID.fromString(rs.getString("player_uuid")),
                     playerName = rs.getString("player_name"),
                     rewardId = rs.getString("reward_id"),

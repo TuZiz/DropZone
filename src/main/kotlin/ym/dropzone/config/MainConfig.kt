@@ -229,5 +229,13 @@ data class RewardOutboxConfig(
     val enabled: Boolean,
     val pollIntervalSeconds: Long,
     val maxAttempts: Int,
-    val claimBatchSize: Int
+    val claimBatchSize: Int,
+    val processingTimeoutSeconds: Long,
+    val consumeMode: OutboxConsumeMode
 )
+
+enum class OutboxConsumeMode {
+    CURRENT_SERVER,
+    SAME_GROUP,
+    ANY_SERVER
+}

@@ -21,7 +21,17 @@ class RewardOutboxWorker(
         val snapshot = configManager.snapshot ?: return
         if (!snapshot.main.rewardOutbox.enabled || running) return
         running = true
-        storage.claimOutboxBatch(snapshot.main.rewardOutbox.claimBatchSize).whenComplete { entries, error ->
+        storage.restoreStaleProcessing(snapshot.main.rewardOutbox.processingTimeoutSeconds).thenCompose { restored ->
+            if (restored > 0) {
+                plugin.logger.warning(
+                    snapshot.lang.format(
+                        ym.dropzone.config.LangKeys.CONFIG_WARNING_OUTBOX_PROCESSING_RESTORED,
+                        mapOf("count" to restored.toString())
+                    )
+                )
+            }
+            storage.claimOutboxBatch(snapshot.main.rewardOutbox.claimBatchSize, snapshot.main.rewardOutbox.consumeMode)
+        }.whenComplete { entries, error ->
             if (error != null) {
                 running = false
                 plugin.logger.warning("DropZone outbox scan failed: server=${snapshot.main.server.id}, group=${snapshot.main.server.group}, activity=${snapshot.activity.id}, error=${error.message ?: error.javaClass.simpleName}")

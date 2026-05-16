@@ -204,7 +204,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
         if (mysqlStorage != null && snapshot.main.crossServer.enabled) {
             val period = snapshot.main.crossServer.syncIntervalSeconds * 20L
             runningTasks += scheduler.runAsyncTimer(period, period) {
-                configManager.reloadAsync().thenAccept { entityManager.syncFromDatabase(it) }
+                configManager.snapshot?.let { entityManager.syncFromDatabase(it) }
             }
         }
         mysqlStorage?.let { storage ->

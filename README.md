@@ -2,6 +2,8 @@
 
 DropZone 是一个 Bukkit/Paper/Purpur/Folia 插件，会在配置区域内随机生成客户端可见的假头颅奖励点。玩家靠近后奖励点会飞向玩家，领取成功后通过控制台命令发奖。
 
+假实体后端使用 PacketEvents 或 ProtocolLib 发送客户端假 ArmorStand 头颅包，不创建服务端真实实体。
+
 ## 胖包说明
 
 本项目使用 Maven 构建胖包：
@@ -103,6 +105,24 @@ spawn:
 领取成功后不会直接把 `Bukkit.dispatchCommand` 当作最终成功。插件先写入 `dropzone_reward_outbox`，再由 `RewardOutboxWorker` 扫描 PENDING 任务，通过 `SchedulerAdapter` 切到安全调度器执行命令。
 
 任务成功后标记 `DONE`，失败会回到 `PENDING` 重试，超过最大次数标记 `FAILED`。服务器崩溃重启后仍会继续处理未完成任务。
+
+关键配置：
+
+```yaml
+reward-outbox:
+  enabled: true
+  poll-interval-seconds: 2
+  max-attempts: 5
+  claim-batch-size: 20
+  processing-timeout-seconds: 60
+  consume-mode: "CURRENT_SERVER"
+```
+
+`consume-mode` 支持：
+
+- `CURRENT_SERVER`：默认，只消费当前 `server.id` 的发奖任务。
+- `SAME_GROUP`：只消费当前 `server.group` 的发奖任务。
+- `ANY_SERVER`：任意服务器都可消费，通常不建议在混合网络中使用。
 
 ## 命令
 

@@ -124,7 +124,7 @@ class DropZoneEntityManager(
                 return@thenCompose future
             }
             scheduler.runAt(location) {
-                val entity = createRuntimeEntity(id, location, snapshot, roll.rarity.id, roll.head.id, roll.reward.id)
+                val entity = createRuntimeEntity(id, location, snapshot, roll.rarity.id, roll.head.id, roll.reward.id, point.expiresAt)
                 future.complete(entity)
             }
             future
@@ -137,7 +137,8 @@ class DropZoneEntityManager(
         snapshot: RuntimeConfigSnapshot,
         rarityId: String,
         headId: String,
-        rewardId: String
+        rewardId: String,
+        expiresAtMillis: Long = System.currentTimeMillis() + snapshot.main.spawn.despawnSeconds * 1000L
     ): DropZoneEntity? {
         if (!plugin.isEnabled || entities.size >= snapshot.main.spawn.maxActive) return null
         val rarity = snapshot.rarities[rarityId] ?: return null
@@ -151,7 +152,7 @@ class DropZoneEntityManager(
             roll = roll,
             itemStack = item,
             spawnLocation = location.clone(),
-            expiresAtMillis = System.currentTimeMillis() + snapshot.main.spawn.despawnSeconds * 1000L,
+            expiresAtMillis = expiresAtMillis,
             glowing = if (snapshot.main.fakeEntity.glowByRarity) roll.rarity.headGlow else snapshot.main.fakeEntity.defaultGlow
         )
         entities[entity.id] = entity
@@ -172,7 +173,7 @@ class DropZoneEntityManager(
                     val world = Bukkit.getWorld(point.worldName) ?: return@forEach
                     val location = Location(world, point.x, point.y, point.z)
                     scheduler.runAt(location) {
-                        if (!entities.containsKey(point.id) && createRuntimeEntity(point.id, location, snapshot, point.rarityId, point.headId, point.rewardId) != null) {
+                        if (!entities.containsKey(point.id) && createRuntimeEntity(point.id, location, snapshot, point.rarityId, point.headId, point.rewardId, point.expiresAt) != null) {
                             added += 1
                         }
                     }

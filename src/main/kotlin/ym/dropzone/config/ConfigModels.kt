@@ -113,6 +113,8 @@ object LangKeys {
     const val CONFIG_ERROR_REGION_MODE = "config-error-region-mode"
     const val CONFIG_ERROR_REWARD_SELECTION_MODE = "config-error-reward-selection-mode"
     const val CONFIG_ERROR_REWARD_COMMAND_EXECUTOR_MODE = "config-error-reward-command-executor-mode"
+    const val CONFIG_ERROR_OUTBOX_CONSUME_MODE = "config-error-outbox-consume-mode"
+    const val CONFIG_WARNING_OUTBOX_PROCESSING_RESTORED = "config-warning-outbox-processing-restored"
     const val CONFIG_ERROR_MANUAL_SPAWN_MODE = "config-error-manual-spawn-mode"
     const val CONFIG_ERROR_Y_RANGE = "config-error-y-range"
     const val CONFIG_ERROR_RARITIES_MISSING = "config-error-rarities-missing"

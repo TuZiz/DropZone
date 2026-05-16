@@ -76,6 +76,7 @@ data class RewardOutboxEntry(
     val id: Long,
     val spawnId: String,
     val activityId: String,
+    val serverGroup: String,
     val playerUuid: UUID,
     val playerName: String,
     val rewardId: String,

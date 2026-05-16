@@ -239,6 +239,11 @@ class ConfigManager(
         if (commandExecutorMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_COMMAND_EXECUTOR_MODE, "path" to "config.reward-command.executor", "value" to commandExecutorText.orEmpty())
         }
+        val outboxConsumeText = yaml.getString("reward-outbox.consume-mode", "CURRENT_SERVER")
+        val outboxConsumeMode = SafeEnumParser.parse<OutboxConsumeMode>(outboxConsumeText)
+        if (outboxConsumeMode == null) {
+            errors += issue(lang, LangKeys.CONFIG_ERROR_OUTBOX_CONSUME_MODE, "path" to "config.reward-outbox.consume-mode", "value" to outboxConsumeText.orEmpty())
+        }
         val manualModeText = yaml.getString("spawn.manual.mode", yaml.getString("spawn.manual-mode", "PLAYER_NEAR"))
         val manualMode = SafeEnumParser.parse<ManualSpawnMode>(manualModeText)
         if (manualMode == null) {
@@ -356,7 +361,9 @@ class ConfigManager(
                 enabled = yaml.getBoolean("reward-outbox.enabled", true),
                 pollIntervalSeconds = yaml.getLong("reward-outbox.poll-interval-seconds", 2L).coerceAtLeast(1L),
                 maxAttempts = yaml.getInt("reward-outbox.max-attempts", 5).coerceAtLeast(1),
-                claimBatchSize = yaml.getInt("reward-outbox.claim-batch-size", 20).coerceAtLeast(1)
+                claimBatchSize = yaml.getInt("reward-outbox.claim-batch-size", 20).coerceAtLeast(1),
+                processingTimeoutSeconds = yaml.getLong("reward-outbox.processing-timeout-seconds", 60L).coerceAtLeast(5L),
+                consumeMode = outboxConsumeMode ?: OutboxConsumeMode.CURRENT_SERVER
             ),
             reload = ReloadConfig(
                 clearActiveEntities = yaml.getBoolean("reload.clear-active-entities", true)
