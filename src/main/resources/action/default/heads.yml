@@ -1,0 +1,44 @@
+# 默认活动头颅池
+# rarity 必须能在 rewards.yml 的 rarities 中找到。
+# texture 使用 Minecraft 头颅材质 base64；weight 越高越容易被抽中。
+
+heads:
+  noml_star:
+    display-name: "<#E6E6E6>普通星星头颅"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMWU0NTFhYmM4ODRlMThiN2QyOGM5NTRkZGVmMDY0ZmYyNTNkNjc2OTZkMjFjOTFmZjc4MGY4YTZjN2VjMDY3ZiJ9fX0="
+    lore:
+      - "<#AAAAAA>一颗普通但闪亮的星星"
+    rarity: "noml"
+    weight: 100
+
+  rare_crystal:
+    display-name: "<#55FFFF>稀有水晶头颅"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNjMyZjBhNjM4NjI0NjE0YzcxOWU1Y2EyZGU0YTM2MjVhZmFlMTU3MmE1MDQzZGUyZWE2NGFiZWQ0MzkifX19"
+    lore:
+      - "<#AAAAAA>散发着淡淡蓝光"
+    rarity: "rare"
+    weight: 30
+
+  epic_cube:
+    display-name: "<#AA00FF>史诗魔方头颅"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZmU0MmRjNGJmOTAwMDI4MTYyZDE3Nzk0ZmYzZTJjODJkN2M2YzBjNTRjMmMyNTZkNTA4YzE4Y2E4ZWE1ZmJjYSJ9fX0="
+    lore:
+      - "<#AAAAAA>蕴含高阶奖励气息"
+    rarity: "epic"
+    weight: 10
+
+  legendary_box:
+    display-name: "<#FFD700>传说宝箱头颅"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvODhjZDQyZjkyMDYxZWQ4OTZjZTVjNDRmYzg4ODllYmI2NGFiMjY4ZWQ1ZWZmYzVjZjY1MWEyMDliYTA4YjQzIn19fQ=="
+    lore:
+      - "<#AAAAAA>里面也许藏着大奖"
+    rarity: "legendary"
+    weight: 5
+
+  mythic_dragon:
+    display-name: "<#FF55FF>神话龙首"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvODI3N2M2YzcwMzlmOWU2Y2EzYjAyMThkZTBjMjE1ZmQzNjk1ZGQzMTUwMmMzNDAzNjIyNjc5MTQ0N2QzODE0In19fQ=="
+    lore:
+      - "<#AAAAAA>传说中的龙魂凝结而成"
+    rarity: "mythic"
+    weight: 1

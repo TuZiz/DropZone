@@ -1,0 +1,127 @@
+# DropZone 主配置
+# 这里只放全局玩法参数、活动资源路径和运行状态存储路径。
+# 玩家可见消息请修改 lang/zh_cn.yml，不要写在本文件。
+
+settings:
+  # 是否输出更多调试信息。
+  debug: false
+  # 当前语言文件，对应 lang/zh_cn.yml。
+  language: "zh_CN"
+
+action:
+  # 活动资源根目录。每个子文件夹都是一个独立活动，例如 action/default。
+  root-folder: "action"
+  # 首次启动或状态文件不存在时使用的默认活动。
+  default-activity: "default"
+  # 每个活动目录内的三个资源文件名，方便服主按习惯改名。
+  config-file: "config.yml"
+  heads-file: "heads.yml"
+  rewards-file: "rewards.yml"
+
+state-storage:
+  # 当前默认只实现 LOCAL_JSON；后续可在代码层扩展 Redis/MySQL。
+  mode: "LOCAL_JSON"
+  # 运行数据目录，不放在 action 活动资源目录内。
+  folder: "data"
+  # 当前激活活动状态文件。
+  active-activity-file: "activity-state.json"
+
+spawn-region:
+  # 生成世界名，不存在时本轮生成会跳过。
+  world: "world"
+  # MAX_RADIUS 使用中心点+半径；BOX 使用 min/max 边界。
+  mode: "MAX_RADIUS"
+  center-x: 0
+  center-z: 0
+  max-radius: 5000
+  min-x: -3000
+  max-x: 3000
+  min-z: -3000
+  max-z: 3000
+  min-y: 80
+  max-y: 160
+
+location-rules:
+  # require-air 要求奖励点所在方块为空气。
+  require-air: true
+  # require-solid-ground 要求奖励点下方有可站立方块。
+  require-solid-ground: true
+  allow-water: false
+  allow-lava: false
+  # 避免生成在特殊或不可用方块附近。
+  avoid-blocks:
+    - "BEDROCK"
+    - "BARRIER"
+  # 单轮最多尝试多少个候选位置。
+  max-location-attempts: 50
+  # 默认不处理未加载区块，避免随机生成造成大量区块加载。
+  allow-unloaded-chunks: false
+  load-chunk-if-needed: false
+
+reward-selection:
+  # RARITY_THEN_REWARD：先抽稀有度，再抽同稀有度奖励和头颅。
+  # RANDOM_REWARD_THEN_MATCH_HEAD：先抽奖励，再匹配同稀有度头颅。
+  mode: "RARITY_THEN_REWARD"
+
+spawn:
+  # 自动生成开关。
+  enabled: true
+  # 自动生成间隔，单位秒。
+  interval-seconds: 300
+  # 同时存在的最大奖励点数量。
+  max-active: 10
+  # 奖励点无人领取时的过期时间，单位秒。
+  despawn-seconds: 600
+  # 插件加载完成后是否立即生成一批奖励点。
+  spawn-on-startup: true
+  startup-amount: 3
+  # 每轮生成最多尝试创建多少个奖励点。
+  attempts-per-cycle: 3
+
+fake-entity:
+  # 玩家进入该距离后才会收到假实体数据包。
+  view-distance: 48.0
+  # 玩家进入该距离后头颅开始吸附。
+  attract-distance: 6.0
+  # 头颅距离玩家小于该值时完成领取。
+  pickup-distance: 1.2
+  # 吸附飞行速度，数值越大飞得越快。
+  fly-speed: 0.35
+  # 假实体更新间隔，单位 tick。
+  update-interval-ticks: 2
+  bobbing: true
+  bobbing-height: 0.25
+  rotate: true
+  rotation-speed: 6.0
+  # true 时优先使用 rewards.yml 中稀有度的 head-glow。
+  glow-by-rarity: true
+  default-glow: false
+
+effects:
+  claim:
+    sound:
+      enabled: true
+      name: "ENTITY_PLAYER_LEVELUP"
+      volume: 1.0
+      pitch: 1.2
+    particle:
+      enabled: true
+      name: "VILLAGER_HAPPY"
+      count: 20
+      offset-x: 0.4
+      offset-y: 0.6
+      offset-z: 0.4
+      speed: 0.02
+    title:
+      # Title 文案在 lang/zh_cn.yml 的 claim-title 和 claim-subtitle。
+      enabled: true
+      fade-in: 10
+      stay: 40
+      fade-out: 10
+    actionbar:
+      # ActionBar 文案在 lang/zh_cn.yml 的 claim-actionbar。
+      enabled: true
+
+reload:
+  # reload 后是否清理旧活动产生的假实体。
+  clear-active-entities: true

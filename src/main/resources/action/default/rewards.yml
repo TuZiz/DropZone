@@ -1,0 +1,77 @@
+# 默认活动奖励池
+# rarities 控制稀有度占比、公告和头颅发光。
+# rewards 控制具体命令奖励；命令由控制台执行，不要写开头的 /。
+
+rarities:
+  noml:
+    display-name: "<#E6E6E6>普通"
+    chance: 80.0
+    weight: 80
+    broadcast: false
+    head-glow: false
+
+  rare:
+    display-name: "<#55FFFF>稀有"
+    chance: 15.0
+    weight: 15
+    broadcast: false
+    head-glow: true
+
+  epic:
+    display-name: "<#AA00FF>史诗"
+    chance: 4.0
+    weight: 4
+    broadcast: true
+    head-glow: true
+
+  legendary:
+    display-name: "<#FFD700>传说"
+    chance: 0.9
+    weight: 0.9
+    broadcast: true
+    head-glow: true
+
+  mythic:
+    display-name: "<#FF55FF>神话"
+    chance: 0.1
+    weight: 0.1
+    broadcast: true
+    head-glow: true
+
+rewards:
+  noml_money_100:
+    rarity: "noml"
+    display-name: "<#55FF55>100金币"
+    weight: 100
+    commands:
+      - "eco give %player% 100"
+
+  diamond_3:
+    rarity: "rare"
+    display-name: "<#55FFFF>3个钻石"
+    weight: 30
+    commands:
+      - "give %player% diamond 3"
+
+  epic_gems:
+    rarity: "epic"
+    display-name: "<#AA00FF>史诗宝石礼包"
+    weight: 10
+    commands:
+      - "give %player% emerald 8"
+      - "eco give %player% 3000"
+
+  vip_key:
+    rarity: "legendary"
+    display-name: "<#FFD700>高级抽奖钥匙"
+    weight: 5
+    commands:
+      - "crate key give %player% advanced 1"
+
+  mythic_key:
+    rarity: "mythic"
+    display-name: "<#FF55FF>神话钥匙"
+    weight: 1
+    commands:
+      - "crate key give %player% mythic 1"
+      - "eco give %player% 10000"

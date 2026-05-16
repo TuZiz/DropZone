@@ -1,0 +1,18 @@
+# 默认活动配置
+# 每个 action/<活动名>/ 都应包含 config.yml、heads.yml、rewards.yml。
+# 本文件只放活动玩法规则，不存放运行数据。
+
+activity:
+  # 活动显示名，可使用 MiniMessage RGB/Hex。
+  display-name: "<#FFD700>默认奖励活动"
+  enabled: true
+
+rules:
+  # /dz start 切换到该活动时，是否清理当前已生成的奖励点。
+  clear-active-on-start: true
+  # 每名玩家最大领取次数；0 表示不限制。
+  max-claims-per-player: 0
+  # 同一玩家两次领取之间的冷却秒数；0 表示不限制。
+  claim-cooldown-seconds: 0
+  # 是否允许同一玩家重复抽到同一奖励。
+  allow-repeat-rewards: true

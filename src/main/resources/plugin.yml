@@ -1,0 +1,34 @@
+name: DropZone
+version: ${project.version}
+main: ym.dropzone.DropZonePlugin
+api-version: "1.16"
+folia-supported: true
+depend:
+  - packetevents
+softdepend:
+  - PlaceholderAPI
+libraries:
+  - org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin.version}
+  - net.kyori:adventure-api:${adventure.version}
+  - net.kyori:adventure-text-minimessage:${adventure.version}
+  - net.kyori:adventure-platform-bukkit:${adventure.platform.version}
+commands:
+  dropzone:
+    aliases:
+      - dz
+    description: DropZone main command
+permissions:
+  dropzone.admin:
+    default: op
+  dropzone.reload:
+    default: op
+  dropzone.spawn:
+    default: op
+  dropzone.start:
+    default: op
+  dropzone.clear:
+    default: op
+  dropzone.list:
+    default: op
+  dropzone.debug:
+    default: op
