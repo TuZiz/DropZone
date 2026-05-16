@@ -26,6 +26,7 @@ import ym.dropzone.scheduler.ScheduledTaskHandle
 import ym.dropzone.scheduler.SchedulerAdapter
 import ym.dropzone.scheduler.SchedulerProvider
 import ym.dropzone.task.EntityTickTask
+import ym.dropzone.task.NavigationActionBarTask
 import ym.dropzone.task.PlayerSnapshotTask
 import ym.dropzone.task.SpawnCycleTask
 import ym.dropzone.task.ViewerUpdateTask
@@ -131,13 +132,21 @@ class DropZonePlugin : JavaPlugin(), Listener {
         runningTasks += scheduler.runGlobalTimer(1L, interval, PlayerSnapshotTask(playerSnapshots)::run)
         runningTasks += scheduler.runGlobalTimer(1L, interval, EntityTickTask(entityManager)::run)
         runningTasks += scheduler.runGlobalTimer(1L, interval, ViewerUpdateTask(entityManager)::run)
+        if (snapshot.main.navigation.actionbarEnabled) {
+            val navigationInterval = snapshot.main.navigation.intervalTicks
+            runningTasks += scheduler.runGlobalTimer(
+                navigationInterval,
+                navigationInterval,
+                NavigationActionBarTask(configManager, scheduler, entityManager, playerSnapshots, langService, placeholderService)::run
+            )
+        }
         if (snapshot.main.spawn.enabled) {
             val period = snapshot.main.spawn.intervalSeconds * 20L
             val spawnTask = { SpawnCycleTask(configManager, scheduler, locationService, entityManager).run() }
             runningTasks += scheduler.runAsyncTimer(period, period, spawnTask)
             if (snapshot.main.spawn.spawnOnStartup) {
-                repeat(snapshot.main.spawn.startupAmount) {
-                    scheduler.runAsync(spawnTask)
+                scheduler.runAsync {
+                    SpawnCycleTask(configManager, scheduler, locationService, entityManager, snapshot.main.spawn.startupAmount).run()
                 }
             }
         }

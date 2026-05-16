@@ -89,11 +89,13 @@ action/summer/
 ```text
 /dropzone reload
 /dropzone start <活动名>
-/dropzone spawn
+/dropzone spawn [数量]
 /dropzone clear
 /dropzone list
 /dropzone debug
 ```
+
+`/dz spawn` 的位置策略由 `config.yml` 的 `spawn.manual.mode` 控制：`REGION_RANDOM` 按活动范围随机生成，`PLAYER_NEAR` 优先在执行玩家附近生成。
 
 别名：
 

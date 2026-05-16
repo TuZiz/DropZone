@@ -2,6 +2,7 @@ package ym.dropzone.util
 
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
+import org.bukkit.Particle
 import java.util.concurrent.ThreadLocalRandom
 
 object WeightedRandom {
@@ -29,4 +30,24 @@ object MiniMessageUtil {
     private val mini = MiniMessage.miniMessage()
 
     fun deserialize(text: String): Component = mini.deserialize(text)
+}
+
+object PlainTextUtil {
+    private val tagPattern = Regex("<[^>]+>")
+
+    fun stripMiniMessage(text: String): String = text.replace(tagPattern, "")
+}
+
+object ParticleUtil {
+    fun parse(name: String): Particle? {
+        val normalized = name.uppercase()
+        val aliases = when (normalized) {
+            "HAPPY_VILLAGER" -> listOf("HAPPY_VILLAGER", "VILLAGER_HAPPY")
+            "VILLAGER_HAPPY" -> listOf("VILLAGER_HAPPY", "HAPPY_VILLAGER")
+            else -> listOf(normalized)
+        }
+        return aliases.firstNotNullOfOrNull { candidate ->
+            runCatching { Particle.valueOf(candidate) }.getOrNull()
+        }
+    }
 }

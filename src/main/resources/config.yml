@@ -73,6 +73,19 @@ spawn:
   startup-amount: 3
   # 每轮生成最多尝试创建多少个奖励点。
   attempts-per-cycle: 3
+  manual:
+    # /dz spawn 的位置模式：
+    # REGION_RANDOM：按当前活动 spawn-region 范围随机生成。
+    # PLAYER_NEAR：优先在执行玩家附近生成，适合测试头颅显示。
+    mode: "REGION_RANDOM"
+    # /dz spawn 不带数量时默认生成几个。
+    amount: 3
+    # /dz spawn <数量> 允许的最大数量，防止误刷。
+    max-amount: 20
+    # PLAYER_NEAR 模式下，在玩家附近多少格内找位置。
+    near-radius: 24
+    # PLAYER_NEAR 模式下是否仍要求 x/z 落在活动 spawn-region 内。
+    respect-region: false
 
 fake-entity:
   # 玩家进入该距离后才会收到假实体数据包。
@@ -93,7 +106,27 @@ fake-entity:
   glow-by-rarity: true
   default-glow: false
 
+navigation:
+  actionbar:
+    # 是否持续在 ActionBar 显示最近奖励点方向。
+    enabled: true
+    # 导航刷新间隔，单位 tick。
+    interval-ticks: 20
+    # 超过该距离不显示最近点导航；0 表示不限制距离。
+    max-distance: 0.0
+
 effects:
+  idle-particle:
+    # 奖励点待机粒子，方便玩家远处发现头颅位置。
+    enabled: true
+    name: "END_ROD"
+    # 每隔多少 tick 播放一次，数值越小越明显。
+    interval-ticks: 10
+    count: 2
+    offset-x: 0.18
+    offset-y: 0.18
+    offset-z: 0.18
+    speed: 0.01
   claim:
     sound:
       enabled: true

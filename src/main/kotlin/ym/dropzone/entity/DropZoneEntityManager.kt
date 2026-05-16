@@ -16,6 +16,7 @@ import ym.dropzone.player.PlayerSnapshotService
 import ym.dropzone.reward.RewardExecutor
 import ym.dropzone.reward.RewardSelector
 import ym.dropzone.scheduler.SchedulerAdapter
+import ym.dropzone.util.ParticleUtil
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -40,6 +41,28 @@ class DropZoneEntityManager(
 
     fun activeCount(): Int = entities.size
     fun activeEntities(): List<DropZoneEntity> = entities.values.toList()
+
+    fun revealTo(playerId: UUID, entity: DropZoneEntity) {
+        if (entities.containsKey(entity.id)) {
+            showOrUpdate(playerId, entity)
+        }
+    }
+
+    fun playSpawnMarker(entity: DropZoneEntity, snapshot: RuntimeConfigSnapshot) {
+        val particle = ParticleUtil.parse(snapshot.main.effects.idleParticle.name)
+            ?: ParticleUtil.parse("VILLAGER_HAPPY")
+            ?: return
+        val loc = entity.currentLocation
+        loc.world?.spawnParticle(
+            particle,
+            loc.clone().add(0.0, 0.35, 0.0),
+            (snapshot.main.effects.idleParticle.count * 6).coerceAtLeast(12),
+            0.35,
+            0.45,
+            0.35,
+            0.02
+        )
+    }
 
     fun createAt(location: Location, snapshot: RuntimeConfigSnapshot): DropZoneEntity? {
         if (!plugin.isEnabled || entities.size >= snapshot.main.spawn.maxActive) return null
@@ -124,6 +147,7 @@ class DropZoneEntityManager(
             entity.lockedPlayer = null
             entity.state.compareAndSet(DropZoneEntityState.ATTRACTING, DropZoneEntityState.WAITING)
             applyIdleMotion(entity, fake.bobbing, fake.bobbingHeight)
+            playIdleParticle(entity, snapshot)
             return
         }
         entity.lockedPlayer = target.uuid
@@ -145,6 +169,32 @@ class DropZoneEntityManager(
             val step = fake.flySpeed.coerceAtMost(distance)
             entity.currentLocation = current.add(dx / distance * step, dy / distance * step, dz / distance * step)
         }
+        playIdleParticle(entity, snapshot)
+    }
+
+    private fun playIdleParticle(entity: DropZoneEntity, snapshot: RuntimeConfigSnapshot) {
+        val effect = snapshot.main.effects.idleParticle
+        if (!effect.enabled || effect.count <= 0) return
+        val now = System.currentTimeMillis()
+        if (now < entity.nextIdleParticleAtMillis) return
+        entity.nextIdleParticleAtMillis = now + effect.intervalTicks * 50L
+        val particle = ParticleUtil.parse(effect.name)
+        if (particle == null) {
+            if (snapshot.main.debug) {
+                plugin.logger.warning(snapshot.lang.format(LangKeys.CONSOLE_INVALID_PARTICLE, mapOf("name" to effect.name)))
+            }
+            return
+        }
+        val loc = entity.currentLocation
+        loc.world?.spawnParticle(
+            particle,
+            loc.clone().add(0.0, 0.35, 0.0),
+            effect.count,
+            effect.offsetX,
+            effect.offsetY,
+            effect.offsetZ,
+            effect.speed
+        )
     }
 
     private fun findTarget(entity: DropZoneEntity, attractDistanceSquared: Double): PlayerPositionSnapshot? {

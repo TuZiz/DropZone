@@ -63,6 +63,8 @@ class PlayerSnapshotService(
 
     fun all(): List<PlayerPositionSnapshot> = snapshots.values.toList()
 
+    fun trackedIds(): List<UUID> = trackedPlayers.toList()
+
     fun byWorld(): Map<UUID, List<PlayerPositionSnapshot>> = snapshots.values.groupBy { it.worldUid }
 
     fun get(uuid: UUID): PlayerPositionSnapshot? = snapshots[uuid]

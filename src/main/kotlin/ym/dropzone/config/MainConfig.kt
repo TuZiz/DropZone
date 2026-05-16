@@ -11,6 +11,7 @@ data class MainConfig(
     val rewardCommandExecutorMode: RewardCommandExecutorMode,
     val spawn: SpawnConfig,
     val fakeEntity: FakeEntityConfig,
+    val navigation: NavigationConfig,
     val effects: EffectsConfig,
     val reload: ReloadConfig
 )
@@ -41,6 +42,11 @@ enum class RewardSelectionMode {
 enum class RewardCommandExecutorMode {
     PLAYER_REGION,
     GLOBAL
+}
+
+enum class ManualSpawnMode {
+    PLAYER_NEAR,
+    REGION_RANDOM
 }
 
 data class SpawnRegionConfig(
@@ -81,7 +87,16 @@ data class SpawnConfig(
     val despawnSeconds: Long,
     val spawnOnStartup: Boolean,
     val startupAmount: Int,
-    val attemptsPerCycle: Int
+    val attemptsPerCycle: Int,
+    val manual: ManualSpawnConfig
+)
+
+data class ManualSpawnConfig(
+    val mode: ManualSpawnMode,
+    val amount: Int,
+    val maxAmount: Int,
+    val nearRadius: Int,
+    val respectRegion: Boolean
 )
 
 data class FakeEntityConfig(
@@ -98,8 +113,15 @@ data class FakeEntityConfig(
     val defaultGlow: Boolean
 )
 
+data class NavigationConfig(
+    val actionbarEnabled: Boolean,
+    val intervalTicks: Long,
+    val maxDistance: Double
+)
+
 data class EffectsConfig(
-    val claim: ClaimEffectsConfig
+    val claim: ClaimEffectsConfig,
+    val idleParticle: IdleParticleEffectConfig
 )
 
 data class ClaimEffectsConfig(
@@ -119,6 +141,17 @@ data class SoundEffectConfig(
 data class ParticleEffectConfig(
     val enabled: Boolean,
     val name: String,
+    val count: Int,
+    val offsetX: Double,
+    val offsetY: Double,
+    val offsetZ: Double,
+    val speed: Double
+)
+
+data class IdleParticleEffectConfig(
+    val enabled: Boolean,
+    val name: String,
+    val intervalTicks: Long,
     val count: Int,
     val offsetX: Double,
     val offsetY: Double,

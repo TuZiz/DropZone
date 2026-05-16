@@ -1,7 +1,6 @@
 package ym.dropzone.reward
 
 import org.bukkit.Bukkit
-import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
@@ -10,6 +9,7 @@ import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.message.LangService
 import ym.dropzone.message.PlaceholderService
 import ym.dropzone.scheduler.SchedulerAdapter
+import ym.dropzone.util.ParticleUtil
 
 class RewardExecutor(
     private val plugin: Plugin,
@@ -67,7 +67,7 @@ class RewardExecutor(
             }
         }
         if (claim.particle.enabled) {
-            val particle = parseParticle(claim.particle.name)
+            val particle = ParticleUtil.parse(claim.particle.name)
             if (particle != null) {
                 player.world.spawnParticle(
                     particle,
@@ -90,15 +90,4 @@ class RewardExecutor(
         }
     }
 
-    private fun parseParticle(name: String): Particle? {
-        val normalized = name.uppercase()
-        val aliases = when (normalized) {
-            "HAPPY_VILLAGER" -> listOf("HAPPY_VILLAGER", "VILLAGER_HAPPY")
-            "VILLAGER_HAPPY" -> listOf("VILLAGER_HAPPY", "HAPPY_VILLAGER")
-            else -> listOf(normalized)
-        }
-        return aliases.firstNotNullOfOrNull { candidate ->
-            runCatching { Particle.valueOf(candidate) }.getOrNull()
-        }
-    }
 }

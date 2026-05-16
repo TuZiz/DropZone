@@ -30,17 +30,17 @@ spawn-region:
   mode: "MAX_RADIUS"
   center-x: 0
   center-z: 0
-  max-radius: 5000
+  max-radius: 96
 
   # 写法二：BOX
   # - 如果把 mode 改成 "BOX"，插件会使用下面的最大/最小边界。
   # - min-x / max-x 是 X 坐标最小值和最大值。
   # - min-z / max-z 是 Z 坐标最小值和最大值。
-  # - min-y / max-y 是生成高度最小值和最大值。
+  # - min-y / max-y 是生成高度最小值和最大值；插件会在该高度内向下寻找可站立地表。
   # - 示例：min-x: -3000, max-x: 3000 表示 X 只能在 -3000 到 3000 之间。
   min-x: -3000
   max-x: 3000
   min-z: -3000
   max-z: 3000
-  min-y: 80
-  max-y: 160
+  min-y: 50
+  max-y: 120

@@ -34,6 +34,7 @@ class DropZoneEntity(
     @Volatile var currentLocation: Location = spawnLocation.clone()
     @Volatile var lockedPlayer: UUID? = null
     @Volatile var yaw: Float = 0f
+    @Volatile var nextIdleParticleAtMillis: Long = 0L
 
     fun markClaiming(): Boolean {
         return claimed.compareAndSet(false, true).also { success ->

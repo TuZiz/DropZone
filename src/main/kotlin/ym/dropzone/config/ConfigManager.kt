@@ -195,6 +195,11 @@ class ConfigManager(
         if (commandExecutorMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_COMMAND_EXECUTOR_MODE, "path" to "config.reward-command.executor", "value" to commandExecutorText.orEmpty())
         }
+        val manualModeText = yaml.getString("spawn.manual.mode", yaml.getString("spawn.manual-mode", "PLAYER_NEAR"))
+        val manualMode = SafeEnumParser.parse<ManualSpawnMode>(manualModeText)
+        if (manualMode == null) {
+            errors += issue(lang, LangKeys.CONFIG_ERROR_MANUAL_SPAWN_MODE, "path" to "config.spawn.manual.mode", "value" to manualModeText.orEmpty())
+        }
         return MainConfig(
             debug = yaml.getBoolean("settings.debug", false),
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
@@ -223,7 +228,14 @@ class ConfigManager(
                 despawnSeconds = yaml.getLong("spawn.despawn-seconds", 600).coerceAtLeast(1),
                 spawnOnStartup = yaml.getBoolean("spawn.spawn-on-startup", true),
                 startupAmount = yaml.getInt("spawn.startup-amount", 3).coerceAtLeast(0),
-                attemptsPerCycle = yaml.getInt("spawn.attempts-per-cycle", 3).coerceAtLeast(1)
+                attemptsPerCycle = yaml.getInt("spawn.attempts-per-cycle", 3).coerceAtLeast(1),
+                manual = ManualSpawnConfig(
+                    mode = manualMode ?: ManualSpawnMode.PLAYER_NEAR,
+                    amount = yaml.getInt("spawn.manual.amount", 3).coerceAtLeast(1),
+                    maxAmount = yaml.getInt("spawn.manual.max-amount", 20).coerceAtLeast(1),
+                    nearRadius = yaml.getInt("spawn.manual.near-radius", yaml.getInt("spawn.manual-near-radius", 24)).coerceAtLeast(1),
+                    respectRegion = yaml.getBoolean("spawn.manual.respect-region", yaml.getBoolean("spawn.manual-respect-region", false))
+                )
             ),
             fakeEntity = FakeEntityConfig(
                 viewDistance = yaml.getDouble("fake-entity.view-distance", 48.0),
@@ -237,6 +249,11 @@ class ConfigManager(
                 rotationSpeed = yaml.getDouble("fake-entity.rotation-speed", 6.0),
                 glowByRarity = yaml.getBoolean("fake-entity.glow-by-rarity", true),
                 defaultGlow = yaml.getBoolean("fake-entity.default-glow", false)
+            ),
+            navigation = NavigationConfig(
+                actionbarEnabled = yaml.getBoolean("navigation.actionbar.enabled", true),
+                intervalTicks = yaml.getLong("navigation.actionbar.interval-ticks", 20L).coerceAtLeast(1L),
+                maxDistance = yaml.getDouble("navigation.actionbar.max-distance", 0.0).coerceAtLeast(0.0)
             ),
             effects = EffectsConfig(
                 claim = ClaimEffectsConfig(
@@ -264,6 +281,16 @@ class ConfigManager(
                     actionbar = ActionBarEffectConfig(
                         yaml.getBoolean("effects.claim.actionbar.enabled", true)
                     )
+                ),
+                idleParticle = IdleParticleEffectConfig(
+                    enabled = yaml.getBoolean("effects.idle-particle.enabled", true),
+                    name = yaml.getString("effects.idle-particle.name", "END_ROD") ?: "END_ROD",
+                    intervalTicks = yaml.getLong("effects.idle-particle.interval-ticks", 10L).coerceAtLeast(1L),
+                    count = yaml.getInt("effects.idle-particle.count", 2).coerceAtLeast(0),
+                    offsetX = yaml.getDouble("effects.idle-particle.offset-x", 0.18),
+                    offsetY = yaml.getDouble("effects.idle-particle.offset-y", 0.18),
+                    offsetZ = yaml.getDouble("effects.idle-particle.offset-z", 0.18),
+                    speed = yaml.getDouble("effects.idle-particle.speed", 0.01)
                 )
             ),
             reload = ReloadConfig(
@@ -388,10 +415,10 @@ class ConfigManager(
 
     private fun parseLang(yaml: YamlConfiguration): LangConfig {
         val section = yaml.getConfigurationSection("messages")
-        val messages = section?.getKeys(false)?.associateWith { section.getString(it, "") ?: "" }.orEmpty()
+        val loaded = section?.getKeys(false)?.associateWith { section.getString(it, "") ?: "" }.orEmpty()
         return LangConfig(
             prefix = yaml.getString("prefix", "") ?: "",
-            messages = messages
+            messages = DEFAULT_LANG_MESSAGES + loaded
         )
     }
 
@@ -422,5 +449,17 @@ class ConfigManager(
         private val ACTIVITY_NAME = Regex("[A-Za-z0-9_-]+")
         private val FILE_NAME = Regex("[A-Za-z0-9_.-]+")
         private val RELATIVE_PATH = Regex("[A-Za-z0-9_./-]+")
+        private val DEFAULT_LANG_MESSAGES = mapOf(
+            LangKeys.NAVIGATION_ACTIONBAR to "<#FFD700>最近奖励点 <#FFFFFF>%distance%m <#AAAAAA>| <#55FFFF>%direction% <#AAAAAA>| <#FFFFFF>%world% %x%, %y%, %z% <#AAAAAA>| <reward>",
+            LangKeys.NAVIGATION_ACTIONBAR_EMPTY to "<#AAAAAA>等待奖励点生成中...",
+            LangKeys.DIRECTION_FRONT to "<#55FF55>前方",
+            LangKeys.DIRECTION_FRONT_LEFT to "<#55FF55>左前",
+            LangKeys.DIRECTION_LEFT to "<#55FF55>左侧",
+            LangKeys.DIRECTION_BACK_LEFT to "<#55FF55>左后",
+            LangKeys.DIRECTION_BACK to "<#55FF55>后方",
+            LangKeys.DIRECTION_BACK_RIGHT to "<#55FF55>右后",
+            LangKeys.DIRECTION_RIGHT to "<#55FF55>右侧",
+            LangKeys.DIRECTION_FRONT_RIGHT to "<#55FF55>右前"
+        )
     }
 }

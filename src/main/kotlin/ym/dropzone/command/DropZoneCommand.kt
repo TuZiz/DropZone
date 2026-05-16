@@ -3,10 +3,13 @@ package ym.dropzone.command
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
+import org.bukkit.entity.Player
 import ym.dropzone.claim.ClaimTracker
 import ym.dropzone.config.ConfigManager
 import ym.dropzone.config.LangConfig
 import ym.dropzone.config.LangKeys
+import ym.dropzone.config.ManualSpawnMode
+import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.entity.DropZoneEntityManager
 import ym.dropzone.message.LangService
 import ym.dropzone.message.PlaceholderService
@@ -29,7 +32,7 @@ class DropZoneCommand(
         when (sub) {
             "reload" -> reload(sender)
             "start" -> start(sender, args.getOrNull(1))
-            "spawn" -> spawn(sender)
+            "spawn" -> spawn(sender, args.getOrNull(1))
             "clear" -> clear(sender)
             "list" -> list(sender)
             "debug" -> debug(sender)
@@ -53,6 +56,7 @@ class DropZoneCommand(
                     claimTracker.clearActivity(snapshot.activity.id)
                 }
                 restartTasks()
+                triggerSpawnCycle()
                 val values = placeholderService.build(
                     snapshot.lang,
                     null,
@@ -84,18 +88,49 @@ class DropZoneCommand(
         }
     }
 
-    private fun spawn(sender: CommandSender) {
+    private fun spawn(sender: CommandSender, amountArg: String?) {
         if (!has(sender, "dropzone.spawn")) return
         val snapshot = configManager.snapshot ?: return sendKey(sender, LangKeys.ADMIN_SPAWN_FAILED)
-        locationService.findLocation(snapshot).thenAccept { location ->
+        val amount = amountArg?.toIntOrNull()
+            ?.coerceIn(1, snapshot.main.spawn.manual.maxAmount)
+            ?: snapshot.main.spawn.manual.amount.coerceAtMost(snapshot.main.spawn.manual.maxAmount)
+        repeat(amount) {
+            spawnOne(sender, snapshot)
+        }
+    }
+
+    private fun spawnOne(sender: CommandSender, snapshot: RuntimeConfigSnapshot) {
+        val locationFuture = when (snapshot.main.spawn.manual.mode) {
+            ManualSpawnMode.PLAYER_NEAR -> {
+                if (sender is Player) {
+                    locationService.findNearPlayer(sender, snapshot).thenCompose { near ->
+                        if (near != null) java.util.concurrent.CompletableFuture.completedFuture(near) else locationService.findLocation(snapshot)
+                    }
+                } else {
+                    locationService.findLocation(snapshot)
+                }
+            }
+            ManualSpawnMode.REGION_RANDOM -> locationService.findLocation(snapshot)
+        }
+        locationFuture.thenAccept { location ->
             if (location == null) {
                 scheduler.runGlobal { sendKey(sender, LangKeys.ADMIN_SPAWN_FAILED) }
                 return@thenAccept
             }
             scheduler.runAt(location) {
                 val entity = entityManager.createAt(location, snapshot)
-                sendKey(sender, if (entity != null) LangKeys.ADMIN_SPAWN_SUCCESS else LangKeys.ADMIN_SPAWN_FAILED)
+                if (entity != null && sender is Player) {
+                    entityManager.revealTo(sender.uniqueId, entity)
+                    entityManager.playSpawnMarker(entity, snapshot)
+                }
+                sendSpawnResultSafely(sender, if (entity != null) LangKeys.ADMIN_SPAWN_SUCCESS else LangKeys.ADMIN_SPAWN_FAILED, location)
             }
+        }
+    }
+
+    private fun triggerSpawnCycle() {
+        scheduler.runAsync {
+            SpawnCycleTask(configManager, scheduler, locationService, entityManager).run()
         }
     }
 
@@ -141,6 +176,28 @@ class DropZoneCommand(
     private fun sendKey(sender: CommandSender, key: String) {
         val lang = configManager.snapshot?.lang ?: return
         langService.send(sender, lang, key, placeholderService.build(lang, null, null, null))
+    }
+
+    private fun sendKeySafely(sender: CommandSender, key: String) {
+        if (sender is Player) {
+            scheduler.runForPlayer(sender) { sendKey(sender, key) }
+        } else {
+            scheduler.runGlobal { sendKey(sender, key) }
+        }
+    }
+
+    private fun sendSpawnResultSafely(sender: CommandSender, key: String, location: org.bukkit.Location) {
+        val send = {
+            val lang = configManager.snapshot?.lang
+            if (lang != null) {
+                langService.send(sender, lang, key, placeholderService.build(lang, null, null, location))
+            }
+        }
+        if (sender is Player) {
+            scheduler.runForPlayer(sender) { send() }
+        } else {
+            scheduler.runGlobal { send() }
+        }
     }
 
     private fun log(sender: CommandSender, lang: LangConfig?, key: String, vararg values: Pair<String, String>) {

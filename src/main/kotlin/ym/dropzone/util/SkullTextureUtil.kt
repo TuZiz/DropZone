@@ -1,6 +1,7 @@
 package ym.dropzone.util
 
 import org.bukkit.Material
+import org.bukkit.Bukkit
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
 import java.util.UUID
@@ -15,17 +16,24 @@ object SkullTextureUtil {
     }
 
     private fun applyBukkitProfile(meta: SkullMeta, texture: String): Boolean {
-        val setter = meta.javaClass.methods.firstOrNull {
-            it.name == "setPlayerProfile" && it.parameterTypes.size == 1
-        } ?: return false
         return runCatching {
-            val bukkit = Class.forName("org.bukkit.Bukkit")
-            val createProfile = bukkit.getMethod("createProfile", UUID::class.java, String::class.java)
-            val playerProfile = createProfile.invoke(null, UUID.nameUUIDFromBytes(texture.toByteArray(Charsets.UTF_8)), "DropZone")
+            val createProfile = Bukkit::class.java.methods.firstOrNull {
+                it.name == "createPlayerProfile" && it.parameterTypes.size == 2
+            } ?: Bukkit::class.java.methods.firstOrNull {
+                it.name == "createProfile" && it.parameterTypes.size == 2
+            } ?: return false
+            val playerProfile = createProfile.invoke(
+                null,
+                UUID.nameUUIDFromBytes(texture.toByteArray(Charsets.UTF_8)),
+                null
+            ) ?: return false
             val textures = playerProfile.javaClass.getMethod("getTextures").invoke(playerProfile)
             val url = decodeTextureUrl(texture) ?: return@runCatching false
             val setSkin = textures.javaClass.methods.firstOrNull { it.name == "setSkin" && it.parameterTypes.size == 1 } ?: return@runCatching false
             setSkin.invoke(textures, java.net.URL(url))
+            val setter = meta.javaClass.methods.firstOrNull {
+                (it.name == "setOwnerProfile" || it.name == "setPlayerProfile") && it.parameterTypes.size == 1
+            } ?: return@runCatching false
             setter.invoke(meta, playerProfile)
             true
         }.getOrDefault(false)

@@ -9,6 +9,7 @@ import com.github.retrooper.packetevents.util.Vector3d
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityVelocity
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity
 import io.github.retrooper.packetevents.util.SpigotConversionUtil
 import org.bukkit.entity.Player
@@ -29,9 +30,10 @@ class PacketEventsEntityAdapter : PacketEntityAdapter {
             loc.yaw,
             entity.yaw,
             0,
-            Optional.empty()
+            Optional.of(Vector3d.zero())
         )
         send(player, spawn)
+        send(player, WrapperPlayServerEntityVelocity(entity.runtimeEntityId, Vector3d.zero()))
         send(player, metadata(player, entity))
     }
 
@@ -57,6 +59,7 @@ class PacketEventsEntityAdapter : PacketEntityAdapter {
             entity.runtimeEntityId,
             listOf(
                 EntityData(0, EntityDataTypes.BYTE, flags),
+                EntityData(5, EntityDataTypes.BOOLEAN, true),
                 EntityData(itemStackMetadataIndex(player), EntityDataTypes.ITEMSTACK, packetItem)
             )
         )
