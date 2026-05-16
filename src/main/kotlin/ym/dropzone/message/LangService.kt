@@ -3,16 +3,20 @@ package ym.dropzone.message
 import net.kyori.adventure.platform.bukkit.BukkitAudiences
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.title.Title
+import net.md_5.bungee.api.ChatMessageType
+import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import ym.dropzone.config.LangConfig
 import ym.dropzone.util.MiniMessageUtil
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicLong
 
 // 所有对玩家和命令发送者可见的文本都从 LangConfig 读取并用 MiniMessage 渲染。
-class LangService(plugin: Plugin, private val placeholders: PlaceholderService) {
+class LangService(private val plugin: Plugin, private val placeholders: PlaceholderService) {
     private val audiences = BukkitAudiences.create(plugin)
+    private val nextActionBarWarningAt = AtomicLong(0L)
 
     fun send(sender: CommandSender, lang: LangConfig, key: String, values: Map<String, String> = emptyMap()) {
         val raw = lang.messages[key] ?: return
@@ -29,14 +33,15 @@ class LangService(plugin: Plugin, private val placeholders: PlaceholderService) 
         val raw = lang.messages[key] ?: return
         val rendered = placeholders.apply(raw, values)
         val component = MiniMessageUtil.deserialize(rendered)
-
-        val adventureSuccess = runCatching {
-            audiences.player(player).sendActionBar(component)
-        }.isSuccess
-
-        if (adventureSuccess) return
-
-        sendSpigotActionBar(player, rendered)
+        val legacy = LegacyComponentSerializer.legacySection().serialize(component)
+        runCatching {
+            player.spigot().sendMessage(
+                ChatMessageType.ACTION_BAR,
+                *TextComponent.fromLegacyText(legacy)
+            )
+        }.onFailure { error ->
+            warnActionBarFailure(key, error)
+        }
     }
 
     fun title(player: Player, lang: LangConfig, titleKey: String, subtitleKey: String, fadeIn: Int, stay: Int, fadeOut: Int, values: Map<String, String>) {
@@ -58,23 +63,16 @@ class LangService(plugin: Plugin, private val placeholders: PlaceholderService) 
         audiences.close()
     }
 
-    private fun sendSpigotActionBar(player: Player, rendered: String) {
-        runCatching {
-            val chatMessageType = Class.forName("net.md_5.bungee.api.ChatMessageType")
-            val actionBar = java.lang.Enum.valueOf(chatMessageType.asSubclass(Enum::class.java), "ACTION_BAR")
-            val textComponent = Class.forName("net.md_5.bungee.api.chat.TextComponent")
-            val baseComponent = Class.forName("net.md_5.bungee.api.chat.BaseComponent")
-            val legacy = LegacyComponentSerializer.legacySection().serialize(MiniMessageUtil.deserialize(rendered))
-            val components = textComponent.getMethod("fromLegacyText", String::class.java).invoke(null, legacy)
-            val spigot = player.javaClass.getMethod("spigot").invoke(player)
-            val sendMessage = spigot.javaClass.methods.firstOrNull { method ->
-                method.name == "sendMessage" &&
-                    method.parameterCount == 2 &&
-                    method.parameterTypes[0].name == "net.md_5.bungee.api.ChatMessageType" &&
-                    method.parameterTypes[1].isArray &&
-                    method.parameterTypes[1].componentType == baseComponent
-            } ?: return@runCatching
-            sendMessage.invoke(spigot, actionBar, components)
-        }
+    private fun warnActionBarFailure(key: String, error: Throwable) {
+        val now = System.currentTimeMillis()
+        val next = nextActionBarWarningAt.get()
+        if (now < next || !nextActionBarWarningAt.compareAndSet(next, now + ACTION_BAR_WARNING_INTERVAL_MILLIS)) return
+        plugin.logger.warning(
+            "DropZone ActionBar send failed for key=$key: ${error.message ?: error.javaClass.simpleName}"
+        )
+    }
+
+    companion object {
+        private const val ACTION_BAR_WARNING_INTERVAL_MILLIS = 30_000L
     }
 }

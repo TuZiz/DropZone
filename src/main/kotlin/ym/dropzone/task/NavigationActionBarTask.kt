@@ -44,21 +44,20 @@ class NavigationActionBarTask(
                 roll = entity.roll
             )
         }
-        val players = playerSnapshots.all()
-        val delivered = HashSet<UUID>()
 
-        for (playerSnapshot in players) {
-            delivered += playerSnapshot.uuid
-            val nearest = entities
-                .asSequence()
-                .filter { entity -> entity.worldUid == playerSnapshot.worldUid }
-                .map { entity ->
-                    entity to playerSnapshot.distanceSquared(entity.x, entity.y, entity.z)
-                }
-                .minByOrNull { it.second }
-
-            scheduler.runForPlayer(playerSnapshot.uuid) { player ->
+        for (playerId in playerSnapshots.trackedIds()) {
+            scheduler.runForPlayer(playerId) { player ->
                 if (!player.isOnline) return@runForPlayer
+                val playerLocation = player.location
+                val playerWorld = player.world
+
+                val nearest = entities
+                    .asSequence()
+                    .filter { entity -> entity.worldUid == playerWorld.uid }
+                    .map { entity ->
+                        entity to distanceSquared(playerLocation.x, playerLocation.y, playerLocation.z, entity.x, entity.y, entity.z)
+                    }
+                    .minByOrNull { it.second }
 
                 if (nearest == null) {
                     sendEmpty(player, snapshot.lang)
@@ -67,6 +66,7 @@ class NavigationActionBarTask(
 
                 val distance = sqrt(nearest.second)
                 if (navigation.maxDistance > 0.0 && distance > navigation.maxDistance) {
+                    sendEmpty(player, snapshot.lang)
                     return@runForPlayer
                 }
 
@@ -78,25 +78,23 @@ class NavigationActionBarTask(
                     location = null,
                     extra = mapOf(
                         "distance" to formatDistance(distance),
-                        "world" to player.world.name,
+                        "world" to playerWorld.name,
                         "x" to entity.blockX.toString(),
                         "y" to entity.blockY.toString(),
                         "z" to entity.blockZ.toString(),
-                        "direction" to directionText(player, entity.x, entity.z, snapshot.lang)
+                        "direction" to directionText(
+                            playerX = playerLocation.x,
+                            playerZ = playerLocation.z,
+                            playerYaw = playerLocation.yaw.toDouble(),
+                            targetX = entity.x,
+                            targetZ = entity.z,
+                            lang = snapshot.lang
+                        )
                     )
                 )
                 langService.actionBar(player, snapshot.lang, LangKeys.NAVIGATION_ACTIONBAR, values)
             }
         }
-
-        playerSnapshots.trackedIds()
-            .asSequence()
-            .filterNot { it in delivered }
-            .forEach { playerId ->
-                scheduler.runForPlayer(playerId) { player ->
-                    if (player.isOnline) sendEmpty(player, snapshot.lang)
-                }
-            }
     }
 
     private fun sendEmpty(player: Player, lang: LangConfig) {
@@ -116,12 +114,25 @@ class NavigationActionBarTask(
         }
     }
 
-    private fun directionText(player: Player, targetX: Double, targetZ: Double, lang: LangConfig): String {
-        val loc = player.location
-        val dx = targetX - loc.x
-        val dz = targetZ - loc.z
+    private fun distanceSquared(fromX: Double, fromY: Double, fromZ: Double, toX: Double, toY: Double, toZ: Double): Double {
+        val dx = fromX - toX
+        val dy = fromY - toY
+        val dz = fromZ - toZ
+        return dx * dx + dy * dy + dz * dz
+    }
 
-        val yaw = Math.toRadians(loc.yaw.toDouble())
+    private fun directionText(
+        playerX: Double,
+        playerZ: Double,
+        playerYaw: Double,
+        targetX: Double,
+        targetZ: Double,
+        lang: LangConfig
+    ): String {
+        val dx = targetX - playerX
+        val dz = targetZ - playerZ
+
+        val yaw = Math.toRadians(playerYaw)
         val forwardX = -sin(yaw)
         val forwardZ = cos(yaw)
         val rightX = cos(yaw)
