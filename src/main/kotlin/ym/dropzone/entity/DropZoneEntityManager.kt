@@ -4,26 +4,34 @@ import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
-import ym.dropzone.config.ConfigManager
+import ym.dropzone.claim.ClaimDenyReason
+import ym.dropzone.claim.ClaimTracker
+import ym.dropzone.config.LangKeys
 import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.head.HeadFactory
+import ym.dropzone.message.LangService
+import ym.dropzone.message.PlaceholderService
 import ym.dropzone.packet.PacketEntityAdapter
+import ym.dropzone.player.PlayerPositionSnapshot
+import ym.dropzone.player.PlayerSnapshotService
 import ym.dropzone.reward.RewardExecutor
-import ym.dropzone.reward.RewardRollResult
 import ym.dropzone.reward.RewardSelector
 import ym.dropzone.scheduler.SchedulerAdapter
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 class DropZoneEntityManager(
     private val plugin: Plugin,
-    private val configManager: ConfigManager,
+    private val configManager: ym.dropzone.config.ConfigManager,
     private val scheduler: SchedulerAdapter,
     private val packetAdapter: PacketEntityAdapter,
+    private val playerSnapshots: PlayerSnapshotService,
+    private val claimTracker: ClaimTracker,
+    private val langService: LangService,
+    private val placeholderService: PlaceholderService,
     private val rewardSelector: RewardSelector,
     private val rewardExecutor: RewardExecutor,
     private val headFactory: HeadFactory
@@ -35,8 +43,7 @@ class DropZoneEntityManager(
     fun activeEntities(): List<DropZoneEntity> = entities.values.toList()
 
     fun createAt(location: Location, snapshot: RuntimeConfigSnapshot): DropZoneEntity? {
-        // 生成阶段先完成奖励和头颅抽取，再创建客户端假实体数据。
-        if (entities.size >= snapshot.main.spawn.maxActive) return null
+        if (!plugin.isEnabled || entities.size >= snapshot.main.spawn.maxActive) return null
         val roll = rewardSelector.roll(snapshot) ?: return null
         val item = headFactory.create(roll.head)
         val entity = DropZoneEntity(
@@ -60,7 +67,6 @@ class DropZoneEntityManager(
                 scheduler.runAt(entity.currentLocation) { remove(entity, destroy = true) }
                 continue
             }
-            // Folia 下把实体状态推进放回实体所在 region，避免跨区直接访问 Bukkit 对象。
             scheduler.runAt(entity.currentLocation) {
                 if (entities.containsKey(entity.id)) updateEntity(entity, snapshot)
             }
@@ -70,24 +76,23 @@ class DropZoneEntityManager(
     fun updateViewers() {
         val snapshot = configManager.snapshot ?: return
         val viewDistanceSquared = snapshot.main.fakeEntity.viewDistance * snapshot.main.fakeEntity.viewDistance
+        val snapshotsByWorld = playerSnapshots.byWorld()
         for (entity in entities.values.toList()) {
-            val currentWorld = entity.currentLocation.world ?: continue
-            for (player in Bukkit.getOnlinePlayers().toList()) {
-                scheduler.runForPlayer(player) {
-                    if (!entities.containsKey(entity.id)) return@runForPlayer
-                if (!player.isOnline || player.world.uid != currentWorld.uid) {
-                    hide(player, entity)
-                    return@runForPlayer
+            val worldUid = entity.worldUid ?: continue
+            val current = entity.currentLocation
+            val seen = mutableSetOf<UUID>()
+            val worldSnapshots = snapshotsByWorld[worldUid].orEmpty()
+            for (viewerSnapshot in worldSnapshots) {
+                seen += viewerSnapshot.uuid
+                val visible = viewerSnapshot.distanceSquared(current.x, current.y, current.z) <= viewDistanceSquared
+                if (visible) {
+                    showOrUpdate(viewerSnapshot.uuid, entity)
+                } else {
+                    hideViewer(viewerSnapshot.uuid, entity)
                 }
-                val visible = player.location.distanceSquared(entity.currentLocation) <= viewDistanceSquared
-                if (visible && entity.visibleTo.add(player.uniqueId)) {
-                    packetAdapter.spawnItemEntity(player, entity)
-                } else if (visible) {
-                    packetAdapter.updateEntity(player, entity)
-                } else if (!visible) {
-                    hide(player, entity)
-                }
-                }
+            }
+            entity.visibleTo.toList().forEach { viewerId ->
+                if (viewerId !in seen) hideViewer(viewerId, entity)
             }
         }
     }
@@ -99,8 +104,10 @@ class DropZoneEntityManager(
     }
 
     fun handleQuit(player: Player) {
+        playerSnapshots.remove(player.uniqueId)
         entities.values.forEach { entity ->
             entity.visibleTo.remove(player.uniqueId)
+            entity.ignoredUntil.remove(player.uniqueId)
             if (entity.lockedPlayer == player.uniqueId) {
                 entity.lockedPlayer = null
                 entity.state.compareAndSet(DropZoneEntityState.ATTRACTING, DropZoneEntityState.WAITING)
@@ -109,7 +116,6 @@ class DropZoneEntityManager(
     }
 
     private fun updateEntity(entity: DropZoneEntity, snapshot: RuntimeConfigSnapshot) {
-        // 每次 tick 推进旋转、漂浮和吸附；领取状态用 AtomicBoolean 防重复发奖。
         val fake = snapshot.main.fakeEntity
         if (fake.rotate) {
             entity.yaw = ((entity.yaw + fake.rotationSpeed) % 360.0).toFloat()
@@ -121,16 +127,21 @@ class DropZoneEntityManager(
             applyIdleMotion(entity, fake.bobbing, fake.bobbingHeight)
             return
         }
-        entity.lockedPlayer = target.uniqueId
+        entity.lockedPlayer = target.uuid
         entity.state.set(DropZoneEntityState.ATTRACTING)
-        val targetLocation = target.location.add(0.0, 1.0, 0.0)
         val current = entity.currentLocation.clone()
-        val dx = targetLocation.x - current.x
-        val dy = targetLocation.y - current.y
-        val dz = targetLocation.z - current.z
+        val dx = target.x - current.x
+        val dy = target.y + 1.0 - current.y
+        val dz = target.z - current.z
         val distance = sqrt(dx * dx + dy * dy + dz * dz)
         if (distance <= fake.pickupDistance && entity.markClaiming()) {
-            claim(entity, target, snapshot)
+            val player = Bukkit.getPlayer(target.uuid)
+            if (player == null) {
+                entity.releaseClaiming()
+                entity.lockedPlayer = null
+            } else {
+                scheduler.runForPlayer(player) { claim(entity, player, snapshot) }
+            }
             return
         }
         if (distance > 0.001) {
@@ -139,15 +150,23 @@ class DropZoneEntityManager(
         }
     }
 
-    private fun findTarget(entity: DropZoneEntity, attractDistanceSquared: Double): Player? {
-        val locked = entity.lockedPlayer?.let { Bukkit.getPlayer(it) }
-        if (locked != null && locked.isOnline && locked.world.uid == entity.currentLocation.world?.uid &&
-            locked.location.distanceSquared(entity.currentLocation) <= attractDistanceSquared * 2.25
-        ) return locked
-        return Bukkit.getOnlinePlayers()
+    private fun findTarget(entity: DropZoneEntity, attractDistanceSquared: Double): PlayerPositionSnapshot? {
+        val now = System.currentTimeMillis()
+        entity.ignoredUntil.entries.removeIf { it.value <= now }
+        val worldUid = entity.worldUid ?: return null
+        val current = entity.currentLocation
+        val locked = entity.lockedPlayer?.let { playerSnapshots.get(it) }
+        if (locked != null &&
+            locked.worldUid == worldUid &&
+            locked.uuid !in entity.ignoredUntil &&
+            locked.distanceSquared(current.x, current.y, current.z) <= attractDistanceSquared * 2.25
+        ) {
+            return locked
+        }
+        return playerSnapshots.all()
             .asSequence()
-            .filter { it.isOnline && it.world.uid == entity.currentLocation.world?.uid }
-            .map { it to it.location.distanceSquared(entity.currentLocation) }
+            .filter { it.worldUid == worldUid && it.uuid !in entity.ignoredUntil }
+            .map { it to it.distanceSquared(current.x, current.y, current.z) }
             .filter { it.second <= attractDistanceSquared }
             .minByOrNull { it.second }
             ?.first
@@ -161,16 +180,54 @@ class DropZoneEntityManager(
     }
 
     private fun claim(entity: DropZoneEntity, player: Player, snapshot: RuntimeConfigSnapshot) {
-        // 先从 active map 移除并销毁假实体，再执行奖励，避免同一奖励点重复领取。
+        if (!plugin.isEnabled || !player.isOnline || !entities.containsKey(entity.id)) {
+            entity.releaseClaiming()
+            entity.lockedPlayer = null
+            return
+        }
+        val claimResult = claimTracker.tryClaim(player.uniqueId, snapshot.activity.id, entity.roll.reward.id, snapshot.activity.rules)
+        if (!claimResult.allowed) {
+            denyClaim(entity, player, snapshot, claimResult.denyReason, claimResult.remainingSeconds)
+            return
+        }
         entity.state.set(DropZoneEntityState.CLAIMED)
         remove(entity, destroy = true)
         rewardExecutor.execute(player, entity.roll, snapshot, entity.currentLocation.clone())
     }
 
-    private fun hide(player: Player, entity: DropZoneEntity) {
-        if (entity.visibleTo.remove(player.uniqueId)) {
-            packetAdapter.destroyEntity(player, entity.runtimeEntityId)
+    private fun denyClaim(entity: DropZoneEntity, player: Player, snapshot: RuntimeConfigSnapshot, reason: ClaimDenyReason?, seconds: Long) {
+        val key = when (reason) {
+            ClaimDenyReason.COOLDOWN -> LangKeys.CLAIM_DENIED_COOLDOWN
+            ClaimDenyReason.MAX_CLAIMS -> LangKeys.CLAIM_DENIED_MAX_CLAIMS
+            ClaimDenyReason.REPEAT_REWARD -> LangKeys.CLAIM_DENIED_REPEAT_REWARD
+            null -> LangKeys.CLAIM_DENIED_MAX_CLAIMS
         }
+        entity.ignoredUntil[player.uniqueId] = System.currentTimeMillis() + 3000L
+        entity.lockedPlayer = null
+        entity.releaseClaiming()
+        val values = placeholderService.build(snapshot.lang, player, entity.roll, entity.currentLocation, mapOf("seconds" to seconds.toString()))
+        langService.send(player, snapshot.lang, key, values)
+    }
+
+    private fun showOrUpdate(playerId: UUID, entity: DropZoneEntity) {
+        val player = Bukkit.getPlayer(playerId) ?: return
+        val firstView = entity.visibleTo.add(playerId)
+        scheduler.runForPlayer(player) {
+            if (!player.isOnline || !entities.containsKey(entity.id)) {
+                entity.visibleTo.remove(playerId)
+                return@runForPlayer
+            }
+            if (firstView) {
+                packetAdapter.spawnItemEntity(player, entity)
+            } else {
+                packetAdapter.updateEntity(player, entity)
+            }
+        }
+    }
+
+    private fun hideViewer(playerId: UUID, entity: DropZoneEntity) {
+        if (!entity.visibleTo.remove(playerId)) return
+        destroyForViewer(playerId, entity.runtimeEntityId)
     }
 
     private fun remove(entity: DropZoneEntity, destroy: Boolean) {
@@ -178,8 +235,15 @@ class DropZoneEntityManager(
         if (destroy) {
             val viewers = entity.visibleTo.toList()
             entity.visibleTo.clear()
-            viewers.mapNotNull { Bukkit.getPlayer(it) }.forEach {
-                packetAdapter.destroyEntity(it, entity.runtimeEntityId)
+            viewers.forEach { destroyForViewer(it, entity.runtimeEntityId) }
+        }
+    }
+
+    private fun destroyForViewer(playerId: UUID, entityId: Int) {
+        val player = Bukkit.getPlayer(playerId) ?: return
+        scheduler.runForPlayer(player) {
+            if (player.isOnline) {
+                packetAdapter.destroyEntity(player, entityId)
             }
         }
     }

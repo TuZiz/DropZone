@@ -4,16 +4,22 @@ import org.bukkit.Material
 import org.bukkit.plugin.Plugin
 import ym.dropzone.config.LocationRulesConfig
 import org.bukkit.Location
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LocationValidator(private val plugin: Plugin) {
+    private val chunkLoadWarningSent = AtomicBoolean(false)
+
     fun isValid(location: Location, rules: LocationRulesConfig): Boolean {
         val world = location.world ?: return false
         val chunkX = location.blockX shr 4
         val chunkZ = location.blockZ shr 4
         if (!world.isChunkLoaded(chunkX, chunkZ)) {
-            if (!rules.allowUnloadedChunks) {
-                if (rules.loadChunkIfNeeded) world.loadChunk(chunkX, chunkZ, true) else return false
+            if (rules.loadChunkIfNeeded || rules.maxSyncChunkLoadsPerCycle > 0) {
+                if (chunkLoadWarningSent.compareAndSet(false, true)) {
+                    plugin.logger.warning("DropZone skipped unloaded chunk validation. Sync chunk loading is disabled for server safety.")
+                }
             }
+            return false
         }
         val block = location.block
         val below = block.getRelative(0, -1, 0)

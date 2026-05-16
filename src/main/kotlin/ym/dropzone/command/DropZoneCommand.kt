@@ -3,6 +3,7 @@ package ym.dropzone.command
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
+import ym.dropzone.claim.ClaimTracker
 import ym.dropzone.config.ConfigManager
 import ym.dropzone.config.LangConfig
 import ym.dropzone.config.LangKeys
@@ -20,6 +21,7 @@ class DropZoneCommand(
     private val locationService: RandomLocationService,
     private val langService: LangService,
     private val placeholderService: PlaceholderService,
+    private val claimTracker: ClaimTracker,
     private val restartTasks: () -> Unit
 ) : CommandExecutor {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
@@ -46,7 +48,10 @@ class DropZoneCommand(
                     log(sender, configManager.lang, LangKeys.CONSOLE_RELOAD_FAILED, "error" to (error?.message ?: activityName))
                     return@runGlobal
                 }
-                if (snapshot.activity.rules.clearActiveOnStart) entityManager.clearAll()
+                if (snapshot.activity.rules.clearActiveOnStart) {
+                    entityManager.clearAll()
+                    claimTracker.clearActivity(snapshot.activity.id)
+                }
                 restartTasks()
                 val values = placeholderService.build(
                     snapshot.lang,
@@ -83,8 +88,12 @@ class DropZoneCommand(
         if (!has(sender, "dropzone.spawn")) return
         val snapshot = configManager.snapshot ?: return sendKey(sender, LangKeys.ADMIN_SPAWN_FAILED)
         locationService.findLocation(snapshot).thenAccept { location ->
-            scheduler.runGlobal {
-                val entity = if (location != null) entityManager.createAt(location, snapshot) else null
+            if (location == null) {
+                scheduler.runGlobal { sendKey(sender, LangKeys.ADMIN_SPAWN_FAILED) }
+                return@thenAccept
+            }
+            scheduler.runAt(location) {
+                val entity = entityManager.createAt(location, snapshot)
                 sendKey(sender, if (entity != null) LangKeys.ADMIN_SPAWN_SUCCESS else LangKeys.ADMIN_SPAWN_FAILED)
             }
         }

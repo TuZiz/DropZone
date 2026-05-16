@@ -6,6 +6,7 @@ import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import ym.dropzone.config.LangKeys
+import ym.dropzone.config.RewardCommandExecutorMode
 import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.message.LangService
 import ym.dropzone.message.PlaceholderService
@@ -18,17 +19,39 @@ class RewardExecutor(
     private val placeholderService: PlaceholderService
 ) {
     fun execute(player: Player, result: RewardRollResult, snapshot: RuntimeConfigSnapshot, location: org.bukkit.Location) {
-        // 奖励命令和消息变量在领取时一次性展开，不再读取任何配置文件。
-        val values = placeholderService.build(snapshot.lang, player, result, location)
         scheduler.runForPlayer(player) {
-            // 发奖命令只在玩家安全调度上下文内执行，命令文本来自内存快照。
-            result.reward.commands.forEach { command ->
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), placeholderService.apply(command, values).removePrefix("/"))
-            }
+            if (!player.isOnline) return@runForPlayer
+            // 奖励变量只基于内存快照和领取现场，不读取 YAML。
+            val values = placeholderService.build(snapshot.lang, player, result, location)
+            dispatchCommands(result, snapshot, values)
             langService.send(player, snapshot.lang, LangKeys.REWARD_CLAIMED, values)
             playEffects(player, snapshot, values)
             if (result.rarity.broadcast) {
-                langService.broadcast(Bukkit.getOnlinePlayers(), snapshot.lang, LangKeys.REWARD_BROADCAST, values)
+                broadcast(snapshot, values)
+            }
+        }
+    }
+
+    private fun dispatchCommands(result: RewardRollResult, snapshot: RuntimeConfigSnapshot, values: Map<String, String>) {
+        val dispatch = {
+            result.reward.commands.forEach { command ->
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), placeholderService.apply(command, values).removePrefix("/"))
+            }
+        }
+        when (snapshot.main.rewardCommandExecutorMode) {
+            RewardCommandExecutorMode.PLAYER_REGION -> dispatch()
+            RewardCommandExecutorMode.GLOBAL -> scheduler.runGlobal(dispatch)
+        }
+    }
+
+    private fun broadcast(snapshot: RuntimeConfigSnapshot, values: Map<String, String>) {
+        scheduler.runGlobal {
+            Bukkit.getOnlinePlayers().forEach { target ->
+                scheduler.runForPlayer(target) {
+                    if (target.isOnline) {
+                        langService.send(target, snapshot.lang, LangKeys.REWARD_BROADCAST, values)
+                    }
+                }
             }
         }
     }

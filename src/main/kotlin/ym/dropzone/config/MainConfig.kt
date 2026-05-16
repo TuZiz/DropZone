@@ -8,6 +8,7 @@ data class MainConfig(
     val spawnRegion: SpawnRegionConfig,
     val locationRules: LocationRulesConfig,
     val rewardSelectionMode: RewardSelectionMode,
+    val rewardCommandExecutorMode: RewardCommandExecutorMode,
     val spawn: SpawnConfig,
     val fakeEntity: FakeEntityConfig,
     val effects: EffectsConfig,
@@ -31,6 +32,11 @@ data class StateStorageConfig(
 enum class RewardSelectionMode {
     RARITY_THEN_REWARD,
     RANDOM_REWARD_THEN_MATCH_HEAD
+}
+
+enum class RewardCommandExecutorMode {
+    PLAYER_REGION,
+    GLOBAL
 }
 
 data class SpawnRegionConfig(
@@ -60,7 +66,8 @@ data class LocationRulesConfig(
     val avoidBlocks: Set<String>,
     val maxLocationAttempts: Int,
     val allowUnloadedChunks: Boolean,
-    val loadChunkIfNeeded: Boolean
+    val loadChunkIfNeeded: Boolean,
+    val maxSyncChunkLoadsPerCycle: Int
 )
 
 data class SpawnConfig(

@@ -175,6 +175,11 @@ class ConfigManager(
         if (selectionMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_SELECTION_MODE, "path" to "config.reward-selection.mode", "value" to selectionText.orEmpty())
         }
+        val commandExecutorText = yaml.getString("reward-command.executor", "PLAYER_REGION")
+        val commandExecutorMode = SafeEnumParser.parse<RewardCommandExecutorMode>(commandExecutorText)
+        if (commandExecutorMode == null) {
+            errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_COMMAND_EXECUTOR_MODE, "path" to "config.reward-command.executor", "value" to commandExecutorText.orEmpty())
+        }
         val minY = yaml.getInt("spawn-region.min-y", 80)
         val maxY = yaml.getInt("spawn-region.max-y", 160)
         if (minY > maxY) {
@@ -207,9 +212,11 @@ class ConfigManager(
                 avoidBlocks = yaml.getStringList("location-rules.avoid-blocks").map { it.uppercase() }.toSet(),
                 maxLocationAttempts = yaml.getInt("location-rules.max-location-attempts", 50).coerceAtLeast(1),
                 allowUnloadedChunks = yaml.getBoolean("location-rules.allow-unloaded-chunks", false),
-                loadChunkIfNeeded = yaml.getBoolean("location-rules.load-chunk-if-needed", false)
+                loadChunkIfNeeded = yaml.getBoolean("location-rules.load-chunk-if-needed", false),
+                maxSyncChunkLoadsPerCycle = yaml.getInt("location-rules.max-sync-chunk-loads-per-cycle", 0).coerceAtLeast(0)
             ),
             rewardSelectionMode = selectionMode ?: RewardSelectionMode.RARITY_THEN_REWARD,
+            rewardCommandExecutorMode = commandExecutorMode ?: RewardCommandExecutorMode.PLAYER_REGION,
             spawn = SpawnConfig(
                 enabled = yaml.getBoolean("spawn.enabled", true),
                 intervalSeconds = yaml.getLong("spawn.interval-seconds", 300).coerceAtLeast(1),

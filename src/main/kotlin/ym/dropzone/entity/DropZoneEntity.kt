@@ -27,6 +27,8 @@ class DropZoneEntity(
     val glowing: Boolean
 ) {
     val visibleTo: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+    val ignoredUntil: MutableMap<UUID, Long> = ConcurrentHashMap()
+    val worldUid: UUID? = spawnLocation.world?.uid
     val state = AtomicReference(DropZoneEntityState.WAITING)
     val claimed = AtomicBoolean(false)
     @Volatile var currentLocation: Location = spawnLocation.clone()
@@ -37,5 +39,10 @@ class DropZoneEntity(
         return claimed.compareAndSet(false, true).also { success ->
             if (success) state.set(DropZoneEntityState.CLAIMING)
         }
+    }
+
+    fun releaseClaiming() {
+        claimed.set(false)
+        state.set(DropZoneEntityState.WAITING)
     }
 }

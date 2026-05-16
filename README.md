@@ -29,7 +29,7 @@ DropZone 是一个 Kotlin + Maven 编写的 Minecraft 插件。插件通过 Pack
 mvn clean package
 ```
 
-当前项目使用本地 `libs/packetevents-spigot-2.12.1-SNAPSHOT.jar` 作为 `system` 编译依赖。DropZone 是薄包，不 shade PacketEvents、Kotlin 或 Adventure；运行时依赖由服务器插件和 `plugin.yml libraries` 提供。
+当前项目通过 CodeMC 远程仓库解析 PacketEvents 编译依赖。DropZone 是薄包，不 shade PacketEvents、Kotlin 或 Adventure；运行时仍需要在服务器 `plugins/` 中单独安装 PacketEvents，Kotlin 与 Adventure 由 `plugin.yml libraries` 加载。
 
 ## 兼容说明
 
@@ -44,6 +44,11 @@ mvn clean package
 - `action/default/heads.yml`：头颅外观和稀有度绑定。
 - `action/default/rewards.yml`：稀有度权重与奖励命令。
 - `lang/zh_cn.yml`：玩家消息、管理员消息、列表和 debug 文本。
+
+`reward-command.executor` 可选：
+
+- `PLAYER_REGION`：默认，在领取玩家调度上下文执行控制台命令。
+- `GLOBAL`：在全局调度上下文执行控制台命令，适合部分只操作全局数据的第三方命令。
 
 ## 活动目录
 

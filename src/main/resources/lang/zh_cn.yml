@@ -1,4 +1,4 @@
-﻿prefix: "<gradient:#FFD700:#FF8800>[DropZone]</gradient> "
+prefix: "<gradient:#FFD700:#FF8800>[DropZone]</gradient> "
 
 messages:
   reward-claimed: "%prefix%<#55FF55>你发现了 <reward> <#AAAAAA>(<rarity><#AAAAAA>)！"
@@ -6,6 +6,9 @@ messages:
   claim-title: "<#FFD700>发现宝藏！"
   claim-subtitle: "<#AAAAAA>你获得了 <reward>"
   claim-actionbar: "<#FFFF55>+ <reward> <#AAAAAA>(<rarity><#AAAAAA>)"
+  claim-denied-cooldown: "%prefix%<#FF5555>领取太快啦，请等待 <#FFFFFF>%seconds% <#FF5555>秒后再试。"
+  claim-denied-max-claims: "%prefix%<#FF5555>你已达到本活动最大领取次数。"
+  claim-denied-repeat-reward: "%prefix%<#FF5555>你已经获得过该奖励，不能重复领取。"
   reload-start: "%prefix%<#FFFF55>正在异步重载配置..."
   reload-success: "%prefix%<#55FF55>配置已异步重载完成。"
   reload-failed: "%prefix%<#FF5555>配置重载失败，请查看控制台。"
@@ -37,6 +40,7 @@ messages:
   config-warning-head-texture-placeholder: "<#FFAA00>头颅材质仍为占位符，已跳过：<#FFFFFF>%path%"
   config-error-region-mode: "<#FF5555>配置项 <#FFFFFF>%path% <#FF5555>只能是 MAX_RADIUS 或 BOX，当前值：<#FFFFFF>%value%"
   config-error-reward-selection-mode: "<#FF5555>配置项 <#FFFFFF>%path% <#FF5555>无效，当前值：<#FFFFFF>%value%"
+  config-error-reward-command-executor-mode: "<#FF5555>配置项 <#FFFFFF>%path% <#FF5555>只能是 PLAYER_REGION 或 GLOBAL，当前值：<#FFFFFF>%value%"
   config-error-y-range: "<#FF5555>生成高度范围无效，min-y=<#FFFFFF>%min%<#FF5555>，max-y=<#FFFFFF>%max%"
   config-error-rarities-missing: "<#FF5555>缺少稀有度配置节点：<#FFFFFF>%path%"
   config-error-rarity-weight: "<#FF5555>稀有度权重必须大于 0：<#FFFFFF>%path%"

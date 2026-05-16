@@ -7,13 +7,15 @@ import ym.dropzone.config.ConfigManager
 import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.entity.DropZoneEntity
 import ym.dropzone.entity.DropZoneEntityManager
+import ym.dropzone.player.PlayerSnapshotService
 import java.util.Locale
 import kotlin.math.sqrt
 
 class DropZonePlaceholderExpansion(
     private val plugin: JavaPlugin,
     private val configManager: ConfigManager,
-    private val entityManager: DropZoneEntityManager
+    private val entityManager: DropZoneEntityManager,
+    private val playerSnapshots: PlayerSnapshotService
 ) : PlaceholderExpansion() {
     override fun getIdentifier(): String = "dropzone"
 
@@ -91,11 +93,13 @@ class DropZonePlaceholderExpansion(
     }
 
     private fun nearestEntity(player: Player): NearestEntity? {
+        val playerSnapshot = playerSnapshots.get(player.uniqueId) ?: return null
         return entityManager.activeEntities()
             .asSequence()
-            .filter { it.currentLocation.world?.uid == player.world.uid }
+            .filter { it.worldUid == playerSnapshot.worldUid }
             .map { entity ->
-                val distanceSquared = entity.currentLocation.distanceSquared(player.location)
+                val current = entity.currentLocation
+                val distanceSquared = playerSnapshot.distanceSquared(current.x, current.y, current.z)
                 NearestEntity(entity, sqrt(distanceSquared))
             }
             .minByOrNull { it.distance }

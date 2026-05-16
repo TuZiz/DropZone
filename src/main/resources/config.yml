@@ -57,11 +57,18 @@ location-rules:
   # 默认不处理未加载区块，避免随机生成造成大量区块加载。
   allow-unloaded-chunks: false
   load-chunk-if-needed: false
+  # 同步加载区块风险较高；默认 0 表示完全禁止同步加载。
+  max-sync-chunk-loads-per-cycle: 0
 
 reward-selection:
   # RARITY_THEN_REWARD：先抽稀有度，再抽同稀有度奖励和头颅。
   # RANDOM_REWARD_THEN_MATCH_HEAD：先抽奖励，再匹配同稀有度头颅。
   mode: "RARITY_THEN_REWARD"
+
+reward-command:
+  # PLAYER_REGION：在领取玩家调度上下文执行命令，默认更适合玩家相关命令。
+  # GLOBAL：在全局调度上下文执行命令，适合只操作全局数据的第三方命令。
+  executor: "PLAYER_REGION"
 
 spawn:
   # 自动生成开关。
