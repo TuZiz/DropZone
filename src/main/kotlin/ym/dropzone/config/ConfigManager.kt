@@ -7,6 +7,7 @@ import ym.dropzone.reward.RarityDefinition
 import ym.dropzone.reward.RewardDefinition
 import ym.dropzone.scheduler.SchedulerAdapter
 import ym.dropzone.storage.LocalJsonActivityStateStore
+import ym.dropzone.storage.ActivityStateStore
 import ym.dropzone.util.SafeEnumParser
 import java.io.File
 import java.util.concurrent.CompletableFuture
@@ -19,6 +20,7 @@ class ConfigManager(
     private val snapshotRef = AtomicReference<RuntimeConfigSnapshot?>()
     private val langRef = AtomicReference<LangConfig?>()
     private val activityNamesRef = AtomicReference<List<String>>(emptyList())
+    private val activityStateStoreRef = AtomicReference<ActivityStateStore?>()
     val snapshot: RuntimeConfigSnapshot? get() = snapshotRef.get()
     val lang: LangConfig? get() = snapshotRef.get()?.lang ?: langRef.get()
     val activityNames: List<String> get() = activityNamesRef.get()
@@ -49,6 +51,18 @@ class ConfigManager(
         return future
     }
 
+    fun loadMainConfigAsync(): CompletableFuture<MainConfig> {
+        val future = CompletableFuture<MainConfig>()
+        scheduler.runAsync {
+            runCatching { loadMainConfig() }.onSuccess(future::complete).onFailure(future::completeExceptionally)
+        }
+        return future
+    }
+
+    fun setActivityStateStore(store: ActivityStateStore?) {
+        activityStateStoreRef.set(store)
+    }
+
     fun startActivityAsync(activityName: String): CompletableFuture<RuntimeConfigSnapshot> {
         val future = CompletableFuture<RuntimeConfigSnapshot>()
         scheduler.runAsync {
@@ -57,7 +71,8 @@ class ConfigManager(
                 val mainYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
                 val files = parseActivityFiles(mainYaml)
                 val storage = parseStateStorage(mainYaml)
-                val store = LocalJsonActivityStateStore(plugin, storage.folder, storage.activeActivityFile, files.defaultActivity)
+                val store = activityStateStoreRef.get()
+                    ?: LocalJsonActivityStateStore(plugin, storage.folder, storage.activeActivityFile, files.defaultActivity)
                 store.write(safeName)
                 val loaded = loadSnapshot()
                 snapshotRef.set(loaded)
@@ -72,7 +87,8 @@ class ConfigManager(
         val mainYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
         val files = parseActivityFiles(mainYaml)
         val storage = parseStateStorage(mainYaml)
-        val activityStateStore = LocalJsonActivityStateStore(plugin, storage.folder, storage.activeActivityFile, files.defaultActivity)
+        val activityStateStore = activityStateStoreRef.get()
+            ?: LocalJsonActivityStateStore(plugin, storage.folder, storage.activeActivityFile, files.defaultActivity)
         val language = mainYaml.getString("settings.language", "zh_CN") ?: "zh_CN"
         val langPath = "lang/${language.lowercase()}.yml"
         val langFile = File(plugin.dataFolder, langPath).takeIf { it.exists() } ?: File(plugin.dataFolder, "lang/zh_cn.yml")
@@ -96,6 +112,7 @@ class ConfigManager(
         }
         val activityYaml = YamlConfiguration.loadConfiguration(File(activityFolder, files.configFile))
         val main = parseMain(mainYaml, lang, errors)
+        validateBootstrap(main)
         val activity = parseActivity(activeActivity, activityYaml, lang, errors)
         if (!activity.enabled) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_ACTIVITY_DISABLED, "activity" to activeActivity)
@@ -142,11 +159,38 @@ class ConfigManager(
     }
 
     private fun parseStateStorage(yaml: YamlConfiguration): StateStorageConfig {
+        val modeText = yaml.getString("storage.mode", yaml.getString("state-storage.mode", "LOCAL_JSON")) ?: "LOCAL_JSON"
+        val mode = SafeEnumParser.parse<StorageMode>(modeText)
+            ?: throw IllegalArgumentException("storage.mode must be LOCAL_JSON or MYSQL, current=$modeText")
         return StateStorageConfig(
-            mode = yaml.getString("state-storage.mode", "LOCAL_JSON") ?: "LOCAL_JSON",
-            folder = safeRelativePath(yaml.getString("state-storage.folder", "data") ?: "data"),
-            activeActivityFile = safeFileName(yaml.getString("state-storage.active-activity-file", "activity-state.json") ?: "activity-state.json")
+            mode = mode,
+            folder = safeRelativePath(yaml.getString("storage.folder", yaml.getString("state-storage.folder", "data")) ?: "data"),
+            activeActivityFile = safeFileName(yaml.getString("storage.active-activity-file", yaml.getString("state-storage.active-activity-file", "activity-state.json")) ?: "activity-state.json"),
+            mysql = MysqlConfig(
+                host = yaml.getString("storage.mysql.host", "127.0.0.1") ?: "127.0.0.1",
+                port = yaml.getInt("storage.mysql.port", 3306).coerceIn(1, 65535),
+                database = yaml.getString("storage.mysql.database", "dropzone") ?: "dropzone",
+                username = yaml.getString("storage.mysql.username", "dropzone") ?: "dropzone",
+                password = yaml.getString("storage.mysql.password", "") ?: "",
+                params = yaml.getString("storage.mysql.params", "useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8") ?: "",
+                poolSize = yaml.getInt("storage.mysql.pool-size", 5).coerceAtLeast(1),
+                connectionTimeoutMs = yaml.getLong("storage.mysql.connection-timeout-ms", 10000L).coerceAtLeast(1000L),
+                maxLifetimeMs = yaml.getLong("storage.mysql.max-lifetime-ms", 1800000L).coerceAtLeast(30000L)
+            )
         )
+    }
+
+    private fun loadMainConfig(): MainConfig {
+        val mainYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
+        val language = mainYaml.getString("settings.language", "zh_CN") ?: "zh_CN"
+        val langFile = File(plugin.dataFolder, "lang/${language.lowercase()}.yml").takeIf { it.exists() } ?: File(plugin.dataFolder, "lang/zh_cn.yml")
+        val lang = parseLang(YamlConfiguration.loadConfiguration(langFile))
+        langRef.set(lang)
+        val errors = mutableListOf<String>()
+        val main = parseMain(mainYaml, lang, errors)
+        if (errors.isNotEmpty()) throw IllegalStateException(errors.joinToString("; "))
+        validateBootstrap(main)
+        return main
     }
 
     private fun parseActivity(
@@ -190,7 +234,7 @@ class ConfigManager(
         if (selectionMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_SELECTION_MODE, "path" to "config.reward-selection.mode", "value" to selectionText.orEmpty())
         }
-        val commandExecutorText = yaml.getString("reward-command.executor", "PLAYER_REGION")
+        val commandExecutorText = yaml.getString("reward-command.executor", "GLOBAL_SAFE")
         val commandExecutorMode = SafeEnumParser.parse<RewardCommandExecutorMode>(commandExecutorText)
         if (commandExecutorMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_COMMAND_EXECUTOR_MODE, "path" to "config.reward-command.executor", "value" to commandExecutorText.orEmpty())
@@ -207,6 +251,15 @@ class ConfigManager(
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
             activityFiles = parseActivityFiles(yaml),
             stateStorage = parseStateStorage(yaml),
+            server = ServerConfig(
+                id = yaml.getString("server.id", "server-1")?.trim().orEmpty().ifBlank { "server-1" },
+                group = yaml.getString("server.group", "main")?.trim().orEmpty().ifBlank { "main" }
+            ),
+            crossServer = CrossServerConfig(
+                enabled = yaml.getBoolean("cross-server.enabled", false),
+                syncIntervalSeconds = yaml.getLong("cross-server.sync-interval-seconds", 3L).coerceAtLeast(1L),
+                spawnOwnerMode = SafeEnumParser.parse<SpawnOwnerMode>(yaml.getString("cross-server.spawn-owner-mode", "ANY_SERVER")) ?: SpawnOwnerMode.ANY_SERVER
+            ),
             claim = ClaimConfig(
                 deniedIgnoreSeconds = yaml.getLong("claim.denied-ignore-seconds", 3L).coerceAtLeast(1L)
             ),
@@ -225,6 +278,7 @@ class ConfigManager(
             rewardCommandExecutorMode = commandExecutorMode ?: RewardCommandExecutorMode.PLAYER_REGION,
             spawn = SpawnConfig(
                 enabled = yaml.getBoolean("spawn.enabled", true),
+                crossServerMode = SafeEnumParser.parse<SpawnCrossServerMode>(yaml.getString("spawn.cross-server-mode", "LOCAL_ONLY")) ?: SpawnCrossServerMode.LOCAL_ONLY,
                 intervalSeconds = yaml.getLong("spawn.interval-seconds", 300).coerceAtLeast(1),
                 maxActive = yaml.getInt("spawn.max-active", 10).coerceAtLeast(0),
                 despawnSeconds = yaml.getLong("spawn.despawn-seconds", 600).coerceAtLeast(1),
@@ -241,7 +295,7 @@ class ConfigManager(
             ),
             fakeEntity = FakeEntityConfig(
                 packetBackend = packetBackend,
-                debugPackets = yaml.getBoolean("fake-entity.debug-packets", true),
+                debugPackets = yaml.getBoolean("fake-entity.debug-packets", false),
                 debugVisibleArmorStand = yaml.getBoolean("fake-entity.debug-visible-armorstand", false),
                 viewDistance = yaml.getDouble("fake-entity.view-distance", 48.0),
                 attractDistance = yaml.getDouble("fake-entity.attract-distance", 6.0),
@@ -298,10 +352,28 @@ class ConfigManager(
                     speed = yaml.getDouble("effects.idle-particle.speed", 0.01)
                 )
             ),
+            rewardOutbox = RewardOutboxConfig(
+                enabled = yaml.getBoolean("reward-outbox.enabled", true),
+                pollIntervalSeconds = yaml.getLong("reward-outbox.poll-interval-seconds", 2L).coerceAtLeast(1L),
+                maxAttempts = yaml.getInt("reward-outbox.max-attempts", 5).coerceAtLeast(1),
+                claimBatchSize = yaml.getInt("reward-outbox.claim-batch-size", 20).coerceAtLeast(1)
+            ),
             reload = ReloadConfig(
                 clearActiveEntities = yaml.getBoolean("reload.clear-active-entities", true)
             )
         )
+    }
+
+    private fun validateBootstrap(main: MainConfig) {
+        if (main.crossServer.enabled && main.stateStorage.mode != StorageMode.MYSQL) {
+            throw IllegalStateException("cross-server.enabled=true requires storage.mode=MYSQL; LOCAL_JSON is only for single-server testing")
+        }
+        if (main.stateStorage.mode == StorageMode.MYSQL && main.stateStorage.mysql.database.isBlank()) {
+            throw IllegalStateException("storage.mysql.database must not be blank")
+        }
+        if (main.crossServer.enabled && main.spawn.crossServerMode != SpawnCrossServerMode.DATABASE_LOCK) {
+            throw IllegalStateException("cross-server.enabled=true requires spawn.cross-server-mode=DATABASE_LOCK")
+        }
     }
 
     private fun parseSpawnRegion(

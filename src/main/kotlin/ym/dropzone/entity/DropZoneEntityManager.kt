@@ -16,8 +16,15 @@ import ym.dropzone.player.PlayerSnapshotService
 import ym.dropzone.reward.RewardExecutor
 import ym.dropzone.reward.RewardSelector
 import ym.dropzone.scheduler.SchedulerAdapter
+import ym.dropzone.storage.MysqlClaimDenyReason
+import ym.dropzone.storage.MysqlClaimRequest
+import ym.dropzone.storage.MysqlStorage
+import ym.dropzone.storage.SpawnPointState
+import ym.dropzone.storage.StoredSpawnPoint
 import ym.dropzone.util.ParticleUtil
+import org.bukkit.Bukkit
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.sin
@@ -34,7 +41,8 @@ class DropZoneEntityManager(
     private val placeholderService: PlaceholderService,
     private val rewardSelector: RewardSelector,
     private val rewardExecutor: RewardExecutor,
-    private val headFactory: HeadFactory
+    private val headFactory: HeadFactory,
+    private val mysqlStorage: MysqlStorage? = null
 ) {
     private val entities = ConcurrentHashMap<UUID, DropZoneEntity>()
     private val nextRuntimeId = AtomicInteger(-1)
@@ -82,9 +90,63 @@ class DropZoneEntityManager(
     fun createAt(location: Location, snapshot: RuntimeConfigSnapshot): DropZoneEntity? {
         if (!plugin.isEnabled || entities.size >= snapshot.main.spawn.maxActive) return null
         val roll = rewardSelector.roll(snapshot) ?: return null
+        return createRuntimeEntity(UUID.randomUUID(), location, snapshot, roll.rarity.id, roll.head.id, roll.reward.id)
+    }
+
+    fun createAtAsync(location: Location, snapshot: RuntimeConfigSnapshot): CompletableFuture<DropZoneEntity?> {
+        val storage = mysqlStorage ?: return CompletableFuture.completedFuture(createAt(location, snapshot))
+        if (!plugin.isEnabled || entities.size >= snapshot.main.spawn.maxActive) return CompletableFuture.completedFuture(null)
+        val roll = rewardSelector.roll(snapshot) ?: return CompletableFuture.completedFuture(null)
+        val id = UUID.randomUUID()
+        val now = System.currentTimeMillis()
+        val point = StoredSpawnPoint(
+            id = id,
+            activityId = snapshot.activity.id,
+            serverGroup = snapshot.main.server.group,
+            worldName = location.world?.name ?: snapshot.activity.spawnRegion.world,
+            worldUuid = location.world?.uid?.toString(),
+            x = location.x,
+            y = location.y,
+            z = location.z,
+            rarityId = roll.rarity.id,
+            headId = roll.head.id,
+            rewardId = roll.reward.id,
+            state = SpawnPointState.WAITING,
+            createdAt = now,
+            expiresAt = now + snapshot.main.spawn.despawnSeconds * 1000L,
+            createdByServer = snapshot.main.server.id,
+            version = 1L
+        )
+        return storage.createSpawnPoint(point).thenCompose { created ->
+            val future = CompletableFuture<DropZoneEntity?>()
+            if (!created) {
+                future.complete(null)
+                return@thenCompose future
+            }
+            scheduler.runAt(location) {
+                val entity = createRuntimeEntity(id, location, snapshot, roll.rarity.id, roll.head.id, roll.reward.id)
+                future.complete(entity)
+            }
+            future
+        }
+    }
+
+    private fun createRuntimeEntity(
+        id: UUID,
+        location: Location,
+        snapshot: RuntimeConfigSnapshot,
+        rarityId: String,
+        headId: String,
+        rewardId: String
+    ): DropZoneEntity? {
+        if (!plugin.isEnabled || entities.size >= snapshot.main.spawn.maxActive) return null
+        val rarity = snapshot.rarities[rarityId] ?: return null
+        val head = snapshot.heads[headId] ?: return null
+        val reward = snapshot.rewards[rewardId] ?: return null
+        val roll = ym.dropzone.reward.RewardRollResult(rarity, reward, head)
         val item = headFactory.create(roll.head)
         val entity = DropZoneEntity(
-            id = UUID.randomUUID(),
+            id = id,
             runtimeEntityId = nextRuntimeId.getAndDecrement(),
             roll = roll,
             itemStack = item,
@@ -96,11 +158,41 @@ class DropZoneEntityManager(
         return entity
     }
 
+    fun syncFromDatabase(snapshot: RuntimeConfigSnapshot): CompletableFuture<Int> {
+        val storage = mysqlStorage ?: return CompletableFuture.completedFuture(0)
+        return storage.loadWaitingSpawns(snapshot.activity.id, snapshot.main.server.group).thenCompose { points ->
+            val wanted = points.map { it.id }.toSet()
+            entities.values
+                .filter { it.id !in wanted }
+                .forEach { scheduler.runAt(it.currentLocation) { remove(it, destroy = true) } }
+            val future = CompletableFuture<Int>()
+            scheduler.runGlobal {
+                var added = 0
+                points.filter { !entities.containsKey(it.id) }.forEach { point ->
+                    val world = Bukkit.getWorld(point.worldName) ?: return@forEach
+                    val location = Location(world, point.x, point.y, point.z)
+                    scheduler.runAt(location) {
+                        if (!entities.containsKey(point.id) && createRuntimeEntity(point.id, location, snapshot, point.rarityId, point.headId, point.rewardId) != null) {
+                            added += 1
+                        }
+                    }
+                }
+                future.complete(added)
+            }
+            future
+        }
+    }
+
     fun tick() {
         val snapshot = configManager.snapshot ?: return
         val now = System.currentTimeMillis()
         for (entity in entities.values.toList()) {
             if (now >= entity.expiresAtMillis && entity.state.compareAndSet(DropZoneEntityState.WAITING, DropZoneEntityState.EXPIRED)) {
+                mysqlStorage?.markExpired(entity.id)?.whenComplete { _, error ->
+                    if (error != null) {
+                        plugin.logger.warning("DropZone MySQL expire failed: server=${configManager.snapshot?.main?.server?.id}, activity=${snapshot.activity.id}, spawnId=${entity.id}, rewardId=${entity.roll.reward.id}, error=${error.message ?: error.javaClass.simpleName}")
+                    }
+                }
                 scheduler.runAt(entity.currentLocation) { remove(entity, destroy = true) }
                 continue
             }
@@ -140,6 +232,13 @@ class DropZoneEntityManager(
         val removed = entities.size
         entities.values.toList().forEach { remove(it, destroy = true) }
         return removed
+    }
+
+    fun clearAllPersistent(snapshot: RuntimeConfigSnapshot): CompletableFuture<Int> {
+        val storage = mysqlStorage ?: return CompletableFuture.completedFuture(clearAll())
+        return storage.clearActive(snapshot.activity.id, snapshot.main.server.group).whenComplete { _, error ->
+            if (error == null) scheduler.runGlobal { clearAll() }
+        }
     }
 
     fun handleQuit(player: Player) {
@@ -249,6 +348,11 @@ class DropZoneEntityManager(
             entity.lockedPlayer = null
             return
         }
+        val storage = mysqlStorage
+        if (storage != null) {
+            claimPersistent(storage, entity, player, snapshot)
+            return
+        }
         val claimResult = claimTracker.tryClaim(player.uniqueId, snapshot.activity.id, entity.roll.reward.id, snapshot.activity.rules)
         if (!claimResult.allowed) {
             denyClaim(entity, player, snapshot, claimResult.denyReason, claimResult.remainingSeconds)
@@ -257,6 +361,52 @@ class DropZoneEntityManager(
         entity.state.set(DropZoneEntityState.CLAIMED)
         remove(entity, destroy = true)
         rewardExecutor.execute(player, entity.roll, snapshot, entity.currentLocation.clone())
+    }
+
+    private fun claimPersistent(storage: MysqlStorage, entity: DropZoneEntity, player: Player, snapshot: RuntimeConfigSnapshot) {
+        val values = placeholderService.build(snapshot.lang, player, entity.roll, entity.currentLocation)
+        val request = MysqlClaimRequest(
+            spawnId = entity.id,
+            activityId = snapshot.activity.id,
+            serverGroup = snapshot.main.server.group,
+            serverId = snapshot.main.server.id,
+            playerUuid = player.uniqueId,
+            playerName = player.name,
+            rewardId = entity.roll.reward.id,
+            rarityId = entity.roll.rarity.id,
+            commands = entity.roll.reward.commands.map { placeholderService.apply(it, values).removePrefix("/") },
+            rules = snapshot.activity.rules,
+            maxAttempts = snapshot.main.rewardOutbox.maxAttempts
+        )
+        val playerId = player.uniqueId
+        storage.claim(request).whenComplete { result, error ->
+            scheduler.runForPlayer(playerId) { online ->
+                if (!online.isOnline) return@runForPlayer
+                if (error != null || result == null || !result.allowed) {
+                    val reason = when (result?.denyReason) {
+                        MysqlClaimDenyReason.COOLDOWN -> ClaimDenyReason.COOLDOWN
+                        MysqlClaimDenyReason.MAX_CLAIMS -> ClaimDenyReason.MAX_CLAIMS
+                        MysqlClaimDenyReason.REPEAT_REWARD -> ClaimDenyReason.REPEAT_REWARD
+                        else -> null
+                    }
+                    if (result?.denyReason == MysqlClaimDenyReason.ALREADY_CLAIMED || result?.denyReason == MysqlClaimDenyReason.NOT_FOUND) {
+                        langService.send(online, snapshot.lang, LangKeys.CLAIM_ALREADY_CLAIMED, values)
+                    } else if (reason != null) {
+                        denyClaim(entity, online, snapshot, reason, result.remainingSeconds)
+                    } else {
+                        entity.releaseClaiming()
+                        entity.lockedPlayer = null
+                        langService.send(online, snapshot.lang, LangKeys.CLAIM_FAILED, values)
+                    }
+                    return@runForPlayer
+                }
+                entity.state.set(DropZoneEntityState.CLAIMED)
+                remove(entity, destroy = true)
+                langService.send(online, snapshot.lang, LangKeys.CLAIM_SUCCESS, values)
+                langService.send(online, snapshot.lang, LangKeys.REWARD_OUTBOX_PENDING, values)
+                rewardExecutor.playClaimEffects(online, entity.roll, snapshot, entity.currentLocation.clone(), values)
+            }
+        }
     }
 
     private fun denyClaim(entity: DropZoneEntity, player: Player, snapshot: RuntimeConfigSnapshot, reason: ClaimDenyReason?, seconds: Long) {

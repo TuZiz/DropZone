@@ -5,6 +5,8 @@ data class MainConfig(
     val language: String,
     val activityFiles: ActivityFilesConfig,
     val stateStorage: StateStorageConfig,
+    val server: ServerConfig,
+    val crossServer: CrossServerConfig,
     val claim: ClaimConfig,
     val locationRules: LocationRulesConfig,
     val rewardSelectionMode: RewardSelectionMode,
@@ -13,6 +15,7 @@ data class MainConfig(
     val fakeEntity: FakeEntityConfig,
     val navigation: NavigationConfig,
     val effects: EffectsConfig,
+    val rewardOutbox: RewardOutboxConfig,
     val reload: ReloadConfig
 )
 
@@ -25,10 +28,43 @@ data class ActivityFilesConfig(
 )
 
 data class StateStorageConfig(
-    val mode: String,
+    val mode: StorageMode,
     val folder: String,
-    val activeActivityFile: String
+    val activeActivityFile: String,
+    val mysql: MysqlConfig
 )
+
+enum class StorageMode {
+    LOCAL_JSON,
+    MYSQL
+}
+
+data class MysqlConfig(
+    val host: String,
+    val port: Int,
+    val database: String,
+    val username: String,
+    val password: String,
+    val params: String,
+    val poolSize: Int,
+    val connectionTimeoutMs: Long,
+    val maxLifetimeMs: Long
+)
+
+data class ServerConfig(
+    val id: String,
+    val group: String
+)
+
+data class CrossServerConfig(
+    val enabled: Boolean,
+    val syncIntervalSeconds: Long,
+    val spawnOwnerMode: SpawnOwnerMode
+)
+
+enum class SpawnOwnerMode {
+    ANY_SERVER
+}
 
 data class ClaimConfig(
     val deniedIgnoreSeconds: Long
@@ -41,7 +77,13 @@ enum class RewardSelectionMode {
 
 enum class RewardCommandExecutorMode {
     PLAYER_REGION,
-    GLOBAL
+    GLOBAL,
+    GLOBAL_SAFE
+}
+
+enum class SpawnCrossServerMode {
+    LOCAL_ONLY,
+    DATABASE_LOCK
 }
 
 enum class ManualSpawnMode {
@@ -87,6 +129,7 @@ data class LocationRulesConfig(
 
 data class SpawnConfig(
     val enabled: Boolean,
+    val crossServerMode: SpawnCrossServerMode,
     val intervalSeconds: Long,
     val maxActive: Int,
     val despawnSeconds: Long,
@@ -180,4 +223,11 @@ data class ActionBarEffectConfig(
 
 data class ReloadConfig(
     val clearActiveEntities: Boolean
+)
+
+data class RewardOutboxConfig(
+    val enabled: Boolean,
+    val pollIntervalSeconds: Long,
+    val maxAttempts: Int,
+    val claimBatchSize: Int
 )

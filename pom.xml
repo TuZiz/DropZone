@@ -19,6 +19,8 @@
         <mysql.version>9.1.0</mysql.version>
         <sqlite.version>3.47.2.0</sqlite.version>
         <postgresql.version>42.7.4</postgresql.version>
+        <hikari.version>5.1.0</hikari.version>
+        <gson.version>2.11.0</gson.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -99,9 +101,14 @@
             <version>${sqlite.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>${postgresql.version}</version>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>${hikari.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson.version}</version>
         </dependency>
         <dependency>
             <groupId>me.clip</groupId>
@@ -159,10 +166,49 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>all</shadedClassifierName>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                             </transformers>
+                            <relocations>
+                                <relocation>
+                                    <pattern>kotlin</pattern>
+                                    <shadedPattern>ym.dropzone.libs.kotlin</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>net.kyori</pattern>
+                                    <shadedPattern>ym.dropzone.libs.adventure</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer.hikari</pattern>
+                                    <shadedPattern>ym.dropzone.libs.hikari</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.mysql</pattern>
+                                    <shadedPattern>ym.dropzone.libs.mysql</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.sqlite</pattern>
+                                    <shadedPattern>ym.dropzone.libs.sqlite</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google.gson</pattern>
+                                    <shadedPattern>ym.dropzone.libs.gson</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google.protobuf</pattern>
+                                    <shadedPattern>ym.dropzone.libs.protobuf</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.slf4j</pattern>
+                                    <shadedPattern>ym.dropzone.libs.slf4j</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.jetbrains.annotations</pattern>
+                                    <shadedPattern>ym.dropzone.libs.annotations</shadedPattern>
+                                </relocation>
+                            </relocations>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>

@@ -1,130 +1,119 @@
 # DropZone 主配置
-# 这里只放全局玩法参数、活动资源路径和运行状态存储路径。
-# 玩家可见消息请修改 lang/zh_cn.yml，不要写在本文件。
+# 玩家可见文本请修改 lang/zh_cn.yml，不要写在本文件。
 
 settings:
-  # 是否输出更多调试信息。
   debug: false
-  # 当前语言文件，对应 lang/zh_cn.yml。
   language: "zh_CN"
 
+storage:
+  # LOCAL_JSON 仅适合单服测试；正式服和多服必须使用 MYSQL。
+  mode: "LOCAL_JSON"
+  # LOCAL_JSON 测试模式使用的本地运行数据目录。
+  folder: "data"
+  active-activity-file: "activity-state.json"
+  mysql:
+    host: "127.0.0.1"
+    port: 3306
+    database: "dropzone"
+    username: "dropzone"
+    password: "password"
+    params: "useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8"
+    pool-size: 5
+    connection-timeout-ms: 10000
+    max-lifetime-ms: 1800000
+
+server:
+  # 必须在同一个服务器网络中唯一。
+  id: "survival-1"
+  # 同一个 group 的服务器共享奖励点，不同 group 互不影响。
+  group: "main"
+
+cross-server:
+  enabled: false
+  # 每隔多少秒从 MySQL 全量同步当前活动和奖励点状态。
+  sync-interval-seconds: 3
+  # ANY_SERVER 表示任意服务器都可在获得数据库锁后生成。
+  spawn-owner-mode: "ANY_SERVER"
+
 action:
-  # 活动资源根目录。每个子文件夹都是一个独立活动，例如 action/default。
   root-folder: "action"
-  # 首次启动或状态文件不存在时使用的默认活动。
   default-activity: "default"
-  # 每个活动目录内的三个资源文件名，方便服主按习惯改名。
   config-file: "config.yml"
   heads-file: "heads.yml"
   rewards-file: "rewards.yml"
 
-state-storage:
-  # 当前默认只实现 LOCAL_JSON；后续可在代码层扩展 Redis/MySQL。
-  mode: "LOCAL_JSON"
-  # 运行数据目录，不放在 action 活动资源目录内。
-  folder: "data"
-  # 当前激活活动状态文件。
-  active-activity-file: "activity-state.json"
-
 claim:
-  # 领取被拒绝后，临时忽略该玩家的秒数，避免反复靠近刷屏。
   denied-ignore-seconds: 3
 
 location-rules:
-  # require-air 要求奖励点所在方块为空气。
   require-air: true
-  # require-solid-ground 要求奖励点下方有可站立方块。
   require-solid-ground: true
   allow-water: false
   allow-lava: false
-  # 避免生成在特殊或不可用方块附近。
   avoid-blocks:
     - "BEDROCK"
     - "BARRIER"
-  # 单轮最多尝试多少个候选位置。
   max-location-attempts: 50
-  # 默认不处理未加载区块，避免随机生成造成大量区块加载。
   allow-unloaded-chunks: false
   load-chunk-if-needed: false
-  # 同步加载区块风险较高；默认 0 表示完全禁止同步加载。
   max-sync-chunk-loads-per-cycle: 0
 
 reward-selection:
-  # RARITY_THEN_REWARD：先抽稀有度，再抽同稀有度奖励和头颅。
-  # RANDOM_REWARD_THEN_MATCH_HEAD：先抽奖励，再匹配同稀有度头颅。
   mode: "RARITY_THEN_REWARD"
 
 reward-command:
-  # PLAYER_REGION：在领取玩家调度上下文执行命令，默认更适合玩家相关命令。
-  # GLOBAL：在全局调度上下文执行命令，适合只操作全局数据的第三方命令。
-  executor: "PLAYER_REGION"
+  # GLOBAL_SAFE 是默认安全模式；PLAYER_REGION 仅用于明确支持 Folia player region 的命令。
+  executor: "GLOBAL_SAFE"
+
+reward-outbox:
+  enabled: true
+  poll-interval-seconds: 2
+  max-attempts: 5
+  claim-batch-size: 20
 
 spawn:
-  # 自动生成开关。
   enabled: true
-  # 自动生成间隔，单位秒。
+  # LOCAL_ONLY 为单服生成；DATABASE_LOCK 通过 MySQL 锁避免多服同时生成。
+  cross-server-mode: "LOCAL_ONLY"
   interval-seconds: 300
-  # 同时存在的最大奖励点数量。
   max-active: 10
-  # 奖励点无人领取时的过期时间，单位秒。
   despawn-seconds: 600
-  # 插件加载完成后是否立即生成一批奖励点。
   spawn-on-startup: true
   startup-amount: 3
-  # 每轮生成最多尝试创建多少个奖励点。
   attempts-per-cycle: 3
   manual:
-    # /dz spawn 的位置模式：
-    # REGION_RANDOM：按当前活动 spawn-region 范围随机生成。
-    # PLAYER_NEAR：优先在执行玩家附近生成，适合测试头颅显示。
     mode: "PLAYER_NEAR"
-    # /dz spawn 不带数量时默认生成几个。
     amount: 1
-    # /dz spawn <数量> 允许的最大数量，防止误刷。
     max-amount: 20
-    # PLAYER_NEAR 模式下，在玩家附近多少格内找位置。
     near-radius: 3
-    # PLAYER_NEAR 模式下是否仍要求 x/z 落在活动 spawn-region 内。
     respect-region: false
 
 fake-entity:
-  # 发包后端二选一：protocollib / packetevents
-  packet-backend: "protocollib"
-  debug-packets: true
+  packet-backend: "packetevents"
+  debug-packets: false
   debug-visible-armorstand: false
-  # 玩家进入该距离后才会收到假实体数据包。
   view-distance: 48.0
-  # 玩家进入该距离后头颅开始吸附。
   attract-distance: 3.0
-  # 头颅距离玩家小于该值时完成领取。
   pickup-distance: 0.7
-  # 吸附飞行速度，数值越大飞得越快。
   fly-speed: 0.22
-  # 假实体更新间隔，单位 tick。
   update-interval-ticks: 2
   bobbing: true
   bobbing-height: 0.25
   rotate: true
   rotation-speed: 6.0
-  # true 时优先使用 rewards.yml 中稀有度的 head-glow。
   glow-by-rarity: true
   default-glow: false
 
 navigation:
   actionbar:
-    # 是否持续在 ActionBar 显示最近奖励点方向。
     enabled: true
-    # 导航刷新间隔，单位 tick。
     interval-ticks: 20
-    # 超过该距离不显示最近点导航；0 表示不限制距离。
     max-distance: 0.0
 
 effects:
   idle-particle:
-    # 奖励点待机粒子，方便玩家远处发现头颅位置。
     enabled: true
     name: "END_ROD"
-    # 每隔多少 tick 播放一次，数值越小越明显。
     interval-ticks: 10
     count: 2
     offset-x: 0.18
@@ -146,15 +135,12 @@ effects:
       offset-z: 0.4
       speed: 0.02
     title:
-      # Title 文案在 lang/zh_cn.yml 的 claim-title 和 claim-subtitle。
       enabled: true
       fade-in: 10
       stay: 40
       fade-out: 10
     actionbar:
-      # ActionBar 文案在 lang/zh_cn.yml 的 claim-actionbar。
       enabled: true
 
 reload:
-  # reload 后是否清理旧活动产生的假实体。
   clear-active-entities: true

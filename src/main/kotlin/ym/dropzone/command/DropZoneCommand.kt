@@ -16,6 +16,7 @@ import ym.dropzone.message.PlaceholderService
 import ym.dropzone.region.RandomLocationService
 import ym.dropzone.scheduler.SchedulerAdapter
 import ym.dropzone.task.SpawnCycleTask
+import ym.dropzone.storage.MysqlStorage
 
 class DropZoneCommand(
     private val configManager: ConfigManager,
@@ -25,6 +26,7 @@ class DropZoneCommand(
     private val langService: LangService,
     private val placeholderService: PlaceholderService,
     private val claimTracker: ClaimTracker,
+    private val mysqlStorage: MysqlStorage?,
     private val restartTasks: () -> Unit
 ) : CommandExecutor {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
@@ -36,6 +38,9 @@ class DropZoneCommand(
             "clear" -> clear(sender)
             "list" -> list(sender)
             "debug" -> debug(sender)
+            "sync" -> sync(sender)
+            "dbstatus" -> dbStatus(sender)
+            "outbox" -> outbox(sender, args.drop(1))
             else -> debug(sender)
         }
         return true
@@ -52,7 +57,7 @@ class DropZoneCommand(
                     return@runGlobal
                 }
                 if (snapshot.activity.rules.clearActiveOnStart) {
-                    entityManager.clearAll()
+                    entityManager.clearAllPersistent(snapshot)
                     claimTracker.clearActivity(snapshot.activity.id)
                 }
                 restartTasks()
@@ -80,8 +85,9 @@ class DropZoneCommand(
                     error?.let { log(sender, oldLang, LangKeys.CONSOLE_RELOAD_FAILED, "error" to (it.message ?: it.javaClass.simpleName)) }
                     return@runGlobal
                 }
-                if (snapshot.main.reload.clearActiveEntities) entityManager.clearAll()
+                if (snapshot.main.reload.clearActiveEntities) entityManager.clearAllPersistent(snapshot)
                 restartTasks()
+                if (mysqlStorage != null) entityManager.syncFromDatabase(snapshot)
                 snapshot.warnings.forEach { sender.server.logger.warning(it) }
                 langService.send(sender, snapshot.lang, LangKeys.RELOAD_SUCCESS, placeholderService.build(snapshot.lang, null, null, null))
             }
@@ -118,12 +124,13 @@ class DropZoneCommand(
                 return@thenAccept
             }
             scheduler.runAt(location) {
-                val entity = entityManager.createAt(location, snapshot)
-                if (entity != null && sender is Player) {
-                    entityManager.revealTo(sender.uniqueId, entity)
-                    entityManager.playSpawnMarker(entity, snapshot)
+                entityManager.createAtAsync(location, snapshot).thenAccept { entity ->
+                    if (entity != null && sender is Player) {
+                        entityManager.revealTo(sender.uniqueId, entity)
+                        entityManager.playSpawnMarker(entity, snapshot)
+                    }
+                    sendSpawnResultSafely(sender, if (entity != null) LangKeys.ADMIN_SPAWN_SUCCESS else LangKeys.ADMIN_SPAWN_FAILED, location)
                 }
-                sendSpawnResultSafely(sender, if (entity != null) LangKeys.ADMIN_SPAWN_SUCCESS else LangKeys.ADMIN_SPAWN_FAILED, location)
             }
         }
     }
@@ -141,15 +148,18 @@ class DropZoneCommand(
                 scheduler,
                 locationService,
                 entityManager,
-                amount.coerceAtLeast(1)
+                amount.coerceAtLeast(1),
+                mysqlStorage
             ).run()
         }
     }
 
     private fun clear(sender: CommandSender) {
         if (!has(sender, "dropzone.clear")) return
-        entityManager.clearAll()
-        sendKey(sender, LangKeys.ADMIN_CLEAR_SUCCESS)
+        val snapshot = configManager.snapshot ?: return
+        entityManager.clearAllPersistent(snapshot).whenComplete { _, _ ->
+            scheduler.runGlobal { sendKey(sender, LangKeys.ADMIN_CLEAR_SUCCESS) }
+        }
     }
 
     private fun list(sender: CommandSender) {
@@ -182,6 +192,62 @@ class DropZoneCommand(
                 LangKeys.DEBUG_LINE,
                 placeholderService.build(snapshot.lang, null, null, null, mapOf("key" to snapshot.lang.format(labelKey), "value" to value))
             )
+        }
+    }
+
+    private fun sync(sender: CommandSender) {
+        if (!has(sender, "dropzone.sync")) return
+        val snapshot = configManager.snapshot ?: return
+        val storage = mysqlStorage ?: return sendKey(sender, LangKeys.DBSTATUS_LOCAL)
+        entityManager.syncFromDatabase(snapshot).whenComplete { _, error ->
+            scheduler.runGlobal {
+                if (error == null) sendKey(sender, LangKeys.CROSS_SERVER_SYNC_COMPLETE) else sendKey(sender, LangKeys.RELOAD_FAILED)
+            }
+        }
+    }
+
+    private fun dbStatus(sender: CommandSender) {
+        if (!has(sender, "dropzone.dbstatus")) return
+        val storage = mysqlStorage ?: return sendKey(sender, LangKeys.DBSTATUS_LOCAL)
+        storage.isHealthy().whenComplete { healthy, _ ->
+            scheduler.runGlobal { sendKey(sender, if (healthy == true) LangKeys.DBSTATUS_CONNECTED else LangKeys.DBSTATUS_FAILED) }
+        }
+    }
+
+    private fun outbox(sender: CommandSender, args: List<String>) {
+        if (!has(sender, "dropzone.outbox")) return
+        val storage = mysqlStorage ?: return sendKey(sender, LangKeys.DBSTATUS_LOCAL)
+        when (args.firstOrNull()?.lowercase()) {
+            "retry" -> {
+                val id = args.getOrNull(1)?.toLongOrNull() ?: return sendKey(sender, LangKeys.REWARD_OUTBOX_FAILED)
+                storage.retryOutbox(id).whenComplete { ok, _ ->
+                    scheduler.runGlobal { sendKey(sender, if (ok == true) LangKeys.REWARD_OUTBOX_PENDING else LangKeys.REWARD_OUTBOX_FAILED) }
+                }
+            }
+            "failed", null -> {
+                storage.outboxStats().whenComplete { stats, _ ->
+                    val lang = configManager.snapshot?.lang ?: return@whenComplete
+                    scheduler.runGlobal {
+                        langService.send(
+                            sender,
+                            lang,
+                            LangKeys.OUTBOX_STATS,
+                            placeholderService.build(
+                                lang,
+                                null,
+                                null,
+                                null,
+                                mapOf(
+                                    "pending" to (stats?.pending ?: 0L).toString(),
+                                    "processing" to (stats?.processing ?: 0L).toString(),
+                                    "done" to (stats?.done ?: 0L).toString(),
+                                    "failed" to (stats?.failed ?: 0L).toString()
+                                )
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 

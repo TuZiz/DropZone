@@ -27,3 +27,9 @@ permissions:
     default: op
   dropzone.debug:
     default: op
+  dropzone.sync:
+    default: op
+  dropzone.dbstatus:
+    default: op
+  dropzone.outbox:
+    default: op

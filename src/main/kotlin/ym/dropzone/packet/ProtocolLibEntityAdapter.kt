@@ -18,6 +18,7 @@ import ym.dropzone.entity.DropZoneEntity
 import ym.dropzone.util.PlainTextUtil
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class ProtocolLibEntityAdapter(
@@ -48,7 +49,12 @@ class ProtocolLibEntityAdapter(
 
     override fun updateEntity(player: Player, entity: DropZoneEntity) {
         val loc = armorStandLocation(entity.currentLocation)
-        val packet = relativeMoveLookPacket(entity, loc) ?: return
+        val packet = relativeMoveLookPacket(entity, loc)
+        if (packet == null) {
+            destroyEntity(player, entity.runtimeEntityId)
+            spawnItemEntity(player, entity)
+            return
+        }
         send(player, packet, "relative-move")
         sentLocations[entity.runtimeEntityId] = loc.clone()
     }
@@ -141,6 +147,9 @@ class ProtocolLibEntityAdapter(
 
     private fun relativeMoveLookPacket(entity: DropZoneEntity, nextLocation: Location): PacketContainer? {
         val previous = sentLocations[entity.runtimeEntityId] ?: return null
+        if (abs(nextLocation.x - previous.x) > 7.5 || abs(nextLocation.y - previous.y) > 7.5 || abs(nextLocation.z - previous.z) > 7.5) {
+            return null
+        }
         val packet = PacketContainer(PacketType.Play.Server.REL_ENTITY_MOVE_LOOK)
         packet.modifier.writeDefaults()
         if (packet.integers.size() <= 0 || packet.shorts.size() < 3) return null

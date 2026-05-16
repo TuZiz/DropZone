@@ -21,6 +21,7 @@ import ym.dropzone.player.PlayerSnapshotService
 import ym.dropzone.region.LocationValidator
 import ym.dropzone.region.RandomLocationService
 import ym.dropzone.reward.RewardExecutor
+import ym.dropzone.reward.RewardOutboxWorker
 import ym.dropzone.reward.RewardSelector
 import ym.dropzone.scheduler.ScheduledTaskHandle
 import ym.dropzone.scheduler.SchedulerAdapter
@@ -30,6 +31,8 @@ import ym.dropzone.task.NavigationActionBarTask
 import ym.dropzone.task.PlayerSnapshotTask
 import ym.dropzone.task.SpawnCycleTask
 import ym.dropzone.task.ViewerUpdateTask
+import ym.dropzone.config.StorageMode
+import ym.dropzone.storage.MysqlStorage
 
 class DropZonePlugin : JavaPlugin(), Listener {
     private lateinit var scheduler: SchedulerAdapter
@@ -40,6 +43,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
     private lateinit var locationService: RandomLocationService
     private lateinit var langService: LangService
     private lateinit var placeholderService: PlaceholderService
+    private var mysqlStorage: MysqlStorage? = null
     private var papiExpansion: Any? = null
     private val runningTasks = mutableListOf<ScheduledTaskHandle>()
 
@@ -53,6 +57,29 @@ class DropZonePlugin : JavaPlugin(), Listener {
         claimTracker = ClaimTracker()
         locationService = RandomLocationService(this, scheduler, LocationValidator(this))
 
+        configManager.loadMainConfigAsync().whenComplete { main, bootstrapError ->
+            if (bootstrapError != null || main == null) {
+                failStartup("configuration bootstrap failed: ${bootstrapError?.message ?: "unknown"}")
+                return@whenComplete
+            }
+            if (main.stateStorage.mode == StorageMode.MYSQL) {
+                val storage = MysqlStorage(main.stateStorage.mysql, main.server, main.activityFiles.defaultActivity)
+                mysqlStorage = storage
+                storage.initialize().whenComplete { _, storageError ->
+                    if (storageError != null) {
+                        failStartup("MySQL initialization failed: ${storageError.message ?: storageError.javaClass.simpleName}")
+                        return@whenComplete
+                    }
+                    configManager.setActivityStateStore(storage)
+                    scheduler.runGlobal { finishEnable() }
+                }
+            } else {
+                scheduler.runGlobal { finishEnable() }
+            }
+        }
+    }
+
+    private fun finishEnable() {
         val rewardSelector = RewardSelector(HeadSelector())
         val rewardExecutor = RewardExecutor(this, scheduler, langService, placeholderService)
         entityManager = DropZoneEntityManager(
@@ -66,13 +93,14 @@ class DropZonePlugin : JavaPlugin(), Listener {
             placeholderService,
             rewardSelector,
             rewardExecutor,
-            HeadFactory()
+            HeadFactory(),
+            mysqlStorage
         )
 
         server.pluginManager.registerEvents(this, this)
         server.onlinePlayers.forEach { playerSnapshots.track(it.uniqueId) }
         getCommand("dropzone")?.setExecutor(
-            DropZoneCommand(configManager, scheduler, entityManager, locationService, langService, placeholderService, claimTracker) { restartRuntimeTasks() }
+            DropZoneCommand(configManager, scheduler, entityManager, locationService, langService, placeholderService, claimTracker, mysqlStorage) { restartRuntimeTasks() }
         )
         getCommand("dropzone")?.tabCompleter = DropZoneTabCompleter(configManager)
         registerPlaceholderApiExpansion()
@@ -85,9 +113,24 @@ class DropZonePlugin : JavaPlugin(), Listener {
             snapshot.warnings.forEach { logger.warning(it) }
             logger.info(
                 "DropZone loaded: activity=${snapshot.activity.id}, spawn=${snapshot.main.spawn.enabled}, " +
-                    "maxActive=${snapshot.main.spawn.maxActive}, rewardCommand=${snapshot.main.rewardCommandExecutorMode}"
+                    "maxActive=${snapshot.main.spawn.maxActive}, rewardCommand=${snapshot.main.rewardCommandExecutorMode}, " +
+                    "storage=${snapshot.main.stateStorage.mode}, server=${snapshot.main.server.id}, group=${snapshot.main.server.group}"
             )
+            if (SchedulerProvider.isFolia()) {
+                logger.warning("DropZone Folia mode: third-party reward commands may require GLOBAL_SAFE-compatible command handlers.")
+            }
             scheduler.runGlobal { startRuntimeTasks() }
+        }
+    }
+
+    private fun failStartup(message: String) {
+        logger.severe("DropZone startup failed: $message")
+        runCatching {
+            if (::scheduler.isInitialized) {
+                scheduler.runGlobal { server.pluginManager.disablePlugin(this) }
+            } else {
+                server.pluginManager.disablePlugin(this)
+            }
         }
     }
 
@@ -98,6 +141,8 @@ class DropZonePlugin : JavaPlugin(), Listener {
         papiExpansion = null
         runningTasks.forEach { it.cancel() }
         runningTasks.clear()
+        mysqlStorage?.close()
+        mysqlStorage = null
         if (::scheduler.isInitialized) scheduler.cancelAll()
         if (::langService.isInitialized) langService.close()
     }
@@ -105,6 +150,9 @@ class DropZonePlugin : JavaPlugin(), Listener {
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         if (::playerSnapshots.isInitialized) playerSnapshots.track(event.player.uniqueId)
+        configManager.snapshot?.let { snapshot ->
+            if (::entityManager.isInitialized && mysqlStorage != null) entityManager.syncFromDatabase(snapshot)
+        }
     }
 
     @EventHandler
@@ -118,6 +166,9 @@ class DropZonePlugin : JavaPlugin(), Listener {
         if (::playerSnapshots.isInitialized) playerSnapshots.remove(event.player.uniqueId)
         if (::entityManager.isInitialized) entityManager.handleQuit(event.player)
         if (::playerSnapshots.isInitialized) playerSnapshots.track(event.player.uniqueId)
+        configManager.snapshot?.let { snapshot ->
+            if (::entityManager.isInitialized && mysqlStorage != null) entityManager.syncFromDatabase(snapshot)
+        }
     }
 
     private fun restartRuntimeTasks() {
@@ -142,12 +193,24 @@ class DropZonePlugin : JavaPlugin(), Listener {
         }
         if (snapshot.main.spawn.enabled) {
             val period = snapshot.main.spawn.intervalSeconds * 20L
-            val spawnTask = { SpawnCycleTask(configManager, scheduler, locationService, entityManager).run() }
+            val spawnTask = { SpawnCycleTask(configManager, scheduler, locationService, entityManager, mysqlStorage = mysqlStorage).run() }
             runningTasks += scheduler.runAsyncTimer(period, period, spawnTask)
             if (snapshot.main.spawn.spawnOnStartup) {
                 scheduler.runAsync {
-                    SpawnCycleTask(configManager, scheduler, locationService, entityManager, snapshot.main.spawn.startupAmount).run()
+                    SpawnCycleTask(configManager, scheduler, locationService, entityManager, snapshot.main.spawn.startupAmount, mysqlStorage).run()
                 }
+            }
+        }
+        if (mysqlStorage != null && snapshot.main.crossServer.enabled) {
+            val period = snapshot.main.crossServer.syncIntervalSeconds * 20L
+            runningTasks += scheduler.runAsyncTimer(period, period) {
+                configManager.reloadAsync().thenAccept { entityManager.syncFromDatabase(it) }
+            }
+        }
+        mysqlStorage?.let { storage ->
+            if (snapshot.main.rewardOutbox.enabled) {
+                val period = snapshot.main.rewardOutbox.pollIntervalSeconds * 20L
+                runningTasks += scheduler.runAsyncTimer(period, period, RewardOutboxWorker(this, configManager, scheduler, storage, placeholderService)::run)
             }
         }
     }

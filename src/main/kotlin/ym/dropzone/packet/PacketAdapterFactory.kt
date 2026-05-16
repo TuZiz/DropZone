@@ -73,7 +73,7 @@ private class SwitchingPacketEntityAdapter(
         if (existing != null) return existing
         return ProtocolLibEntityAdapter(
             plugin = plugin,
-            debugPackets = { configManager.snapshot?.main?.fakeEntity?.debugPackets ?: true },
+            debugPackets = { configManager.snapshot?.main?.fakeEntity?.debugPackets ?: false },
             debugVisibleArmorStand = { configManager.snapshot?.main?.fakeEntity?.debugVisibleArmorStand ?: false }
         ).also {
             protocolLibAdapter = it
@@ -84,7 +84,7 @@ private class SwitchingPacketEntityAdapter(
     private fun packetEvents(): PacketEntityAdapter {
         val existing = packetEventsAdapter
         if (existing != null) return existing
-        return PacketEventsEntityAdapter().also {
+        return PacketEventsEntityAdapter { configManager.snapshot?.main?.fakeEntity?.debugPackets ?: false }.also {
             packetEventsAdapter = it
             plugin.logger.info("[DropZone] Fake entity packet backend initialized: PACKETEVENTS")
         }

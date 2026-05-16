@@ -1,201 +1,149 @@
 # DropZone
 
-DropZone 是一个 Minecraft 奖励点插件。它会在配置区域内随机生成客户端可见的假头颅奖励点，玩家靠近后头颅会飞向玩家，领取后通过控制台命令发放奖励。
+DropZone 是一个 Bukkit/Paper/Purpur/Folia 插件，会在配置区域内随机生成客户端可见的假头颅奖励点。玩家靠近后奖励点会飞向玩家，领取成功后通过控制台命令发奖。
 
-插件使用 PacketEvents 显示假物品实体，不生成真实掉落物，不使用 ProtocolLib、NMS、ArmorStand 或 Display Entity。
+## 胖包说明
 
-## 功能
-
-- 随机生成自定义皮肤头颅奖励点。
-- 支持 `MAX_RADIUS` 和 `BOX` 两种生成区域。
-- 支持生成高度、区块加载策略、地面/空气/水/岩浆检查。
-- 玩家进入可视距离后显示假实体。
-- 玩家进入吸附距离后头颅平滑飞向玩家。
-- 领取后自动销毁假实体并执行奖励命令。
-- 支持稀有度、权重、公告和头颅发光。
-- 支持多个活动目录，通过 `/dz start <活动名>` 切换活动。
-- 每个活动可单独配置生成世界和生成范围。
-- 支持领取次数限制、领取冷却、禁止重复获得同一奖励。
-- 支持音效、粒子、Title、ActionBar。
-- 支持 PlaceholderAPI 变量。
-- 支持 Spigot / Paper / Purpur / Folia。
-
-## 安装
-
-1. 将 `DropZone-1.0.0.jar` 放入服务器 `plugins/` 目录。
-2. 将 PacketEvents 插件也放入服务器 `plugins/` 目录。
-3. 如果需要 PlaceholderAPI 变量，将 PlaceholderAPI 插件放入服务器 `plugins/` 目录。
-4. 启动服务器生成默认配置。
-5. 修改 `config.yml` 和 `action/default/` 下的活动文件。
-6. 执行 `/dz reload` 重载配置。
-
-DropZone jar 已内置 Kotlin、Adventure、MySQL、SQLite、PostgreSQL 驱动；PacketEvents 仍需作为独立插件安装。
-
-## 构建
+本项目使用 Maven 构建胖包：
 
 ```bash
 mvn clean package
 ```
 
-构建产物在：
+正式产物：
 
 ```text
-target/DropZone-1.0.0.jar
+target/DropZone-1.0.0-all.jar
 ```
 
-该 jar 会包含 Kotlin、Adventure 和常用数据库驱动，不包含 PacketEvents、PlaceholderAPI 或服务端 API。
+插件不使用 `plugin.yml libraries`。Kotlin、Adventure/MiniMessage、HikariCP、MySQL JDBC、Gson 会被 shade 并 relocate 到 `ym.dropzone.libs.*`。
 
-## 配置文件
+PacketEvents、ProtocolLib、PlaceholderAPI 仍由服务器插件环境提供，不会被打进 DropZone jar。
 
-```text
-plugins/DropZone/config.yml
-plugins/DropZone/lang/zh_cn.yml
-plugins/DropZone/action/default/config.yml
-plugins/DropZone/action/default/heads.yml
-plugins/DropZone/action/default/rewards.yml
+## 运行依赖
+
+- Java 17
+- Minecraft 1.16.5+
+- Spigot / Paper / Purpur / Folia
+- PacketEvents 或 ProtocolLib 至少安装一个
+- PlaceholderAPI 可选
+- MySQL 8.x 或兼容 MySQL 协议的数据库
+
+## 存储模式
+
+默认配置使用 `LOCAL_JSON`，方便单服直接启动测试。`storage.mode` 支持：
+
+- `LOCAL_JSON`：仅适合单服测试。
+- `MYSQL`：正式服和多服跨服模式，需要手动启用。
+
+`cross-server.enabled=true` 时必须使用 `MYSQL`，并把 `spawn.cross-server-mode` 改为 `DATABASE_LOCK`，否则插件会拒绝启动，不会静默回退到本地 JSON。
+
+## MySQL 配置
+
+启用 MySQL 时，将 `storage.mode` 改为 `MYSQL`：
+
+```yaml
+storage:
+  mode: MYSQL
+  mysql:
+    host: "127.0.0.1"
+    port: 3306
+    database: "dropzone"
+    username: "dropzone"
+    password: "password"
+    params: "useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8"
+    pool-size: 5
+    connection-timeout-ms: 10000
+    max-lifetime-ms: 1800000
 ```
 
-- `config.yml`：全局吸附距离、奖励点表现、效果和运行策略。
-- `lang/zh_cn.yml`：所有玩家可见消息。
-- `action/<活动名>/config.yml`：活动开关、领取规则、活动专属生成世界和范围。每个活动都必须配置 `spawn-region`。
-- `action/<活动名>/heads.yml`：头颅材质、显示名、lore、稀有度和权重。
-- `action/<活动名>/rewards.yml`：稀有度、奖励权重、公告和奖励命令。
+所有数据库 IO 都在线程池中执行，不在 Bukkit 主线程或 Folia region thread 阻塞。
 
-## 活动目录
+## 多服部署示例
 
-每个活动都是一个独立文件夹：
+Velocity 网络示例：
 
-```text
-action/default/
-  config.yml
-  heads.yml
-  rewards.yml
+- `survival-1`
+- `survival-2`
+- `resource`
+- `lobby`
+
+同一组服务器使用相同 `server.group`，共享奖励点状态：
+
+```yaml
+server:
+  id: "survival-1"
+  group: "survival"
+
+cross-server:
+  enabled: true
+  sync-interval-seconds: 3
+
+spawn:
+  cross-server-mode: "DATABASE_LOCK"
 ```
 
-新增活动时复制 `default` 文件夹并改名，例如：
+每台子服的 `server.id` 必须唯一。数据库是唯一权威数据源，本地内存只是缓存；定时同步会修复错过的领取、过期和清理状态。
 
-```text
-action/summer/
-```
+## 数据库表
 
-然后使用：
+启动时自动建表：
 
-```text
-/dz start summer
-```
+- `dropzone_schema_version`：结构版本。
+- `dropzone_activity_state`：当前活动与版本。
+- `dropzone_spawn_points`：奖励点权威状态，包含 WAITING/CLAIMED/EXPIRED/CLEARED。
+- `dropzone_claims`：玩家领取历史，用于次数、冷却和重复奖励限制。
+- `dropzone_reward_outbox`：可恢复发奖队列。
+- `dropzone_locks`：跨服生成锁，避免多服同时生成过量奖励点。
+
+领取事务会 `SELECT ... FOR UPDATE` 锁定奖励点，检查状态、次数、冷却、重复奖励限制，然后更新奖励点、写领取记录、写 outbox，并在事务提交后才移除本地假实体。
+
+## Outbox 发奖队列
+
+领取成功后不会直接把 `Bukkit.dispatchCommand` 当作最终成功。插件先写入 `dropzone_reward_outbox`，再由 `RewardOutboxWorker` 扫描 PENDING 任务，通过 `SchedulerAdapter` 切到安全调度器执行命令。
+
+任务成功后标记 `DONE`，失败会回到 `PENDING` 重试，超过最大次数标记 `FAILED`。服务器崩溃重启后仍会继续处理未完成任务。
 
 ## 命令
 
 ```text
-/dropzone reload
-/dropzone start <活动名>
-/dropzone spawn [数量]
-/dropzone clear
-/dropzone list
-/dropzone debug
+/dz reload
+/dz start <activity>
+/dz spawn [amount]
+/dz clear
+/dz list
+/dz debug
+/dz sync
+/dz dbstatus
+/dz outbox
+/dz outbox retry <id>
+/dz outbox failed
 ```
 
-`/dz spawn` 的位置策略由 `config.yml` 的 `spawn.manual.mode` 控制：`REGION_RANDOM` 按活动范围随机生成，`PLAYER_NEAR` 优先在执行玩家附近生成。
-
-别名：
+新增权限：
 
 ```text
-/dz
+dropzone.sync
+dropzone.dbstatus
+dropzone.outbox
 ```
 
-## 权限
+## Folia 注意事项
 
-```text
-dropzone.admin
-dropzone.reload
-dropzone.start
-dropzone.spawn
-dropzone.clear
-dropzone.list
-dropzone.debug
-```
+插件保留 `SchedulerAdapter`。玩家操作通过 player scheduler，世界/位置操作通过 region scheduler，全局命令通过 global scheduler。`reward-command.executor` 默认是 `GLOBAL_SAFE`。
 
-## PlaceholderAPI
-
-安装 PlaceholderAPI 后可使用 `%dropzone_*%` 变量。
-
-常用变量：
-
-```text
-%dropzone_loaded%
-%dropzone_status%
-%dropzone_activity%
-%dropzone_activity_name%
-%dropzone_active_count%
-%dropzone_max_active%
-%dropzone_remaining_slots%
-%dropzone_spawn_enabled%
-%dropzone_rarity_count%
-%dropzone_head_count%
-%dropzone_reward_count%
-%dropzone_nearest_distance%
-%dropzone_nearest_reward%
-%dropzone_nearest_rarity%
-%dropzone_nearest_head%
-```
-
-## 奖励命令变量
-
-奖励命令和消息支持：
-
-```text
-%player%
-%uuid%
-%reward_id%
-%reward%
-%rarity_id%
-%rarity%
-%head_id%
-%head%
-%x%
-%y%
-%z%
-%world%
-%prefix%
-```
-
-示例：
-
-```yaml
-commands:
-  - "eco give %player% 100"
-  - "give %player% diamond 3"
-```
-
-## 头颅材质
-
-`heads.yml` 中的 `texture` 使用 Minecraft 头颅 base64 材质。默认配置已包含可用示例材质，可以直接运行测试。
-
-如果材质仍是 `CHANGE_ME_BASE64_TEXTURE`，该头颅会被跳过。
-
-## 领取规则
-
-活动配置支持：
-
-```yaml
-rules:
-  clear-active-on-start: true
-  max-claims-per-player: 0
-  claim-cooldown-seconds: 0
-  allow-repeat-rewards: true
-```
-
-- `max-claims-per-player: 0` 表示不限制领取次数。
-- `claim-cooldown-seconds: 0` 表示不限制领取冷却。
-- `allow-repeat-rewards: false` 表示同一活动中同一玩家不能重复获得同一个 reward id。
+部分第三方插件命令可能不完全兼容 Folia，请确认奖励命令目标插件支持当前调度方式。
 
 ## 常见问题
 
-**看不到头颅怎么办？**  
-确认服务器已安装 PacketEvents，并确认玩家和奖励点在同一世界且距离小于 `fake-entity.view-distance`。
+**是否需要 Redis？**  
+不需要。当前版本使用 MySQL 权威状态、本地缓存和定时同步，不引入 Redis。
 
-**奖励命令不执行怎么办？**  
-奖励命令由控制台执行，配置中不要写开头的 `/`。同时确认经济、抽奖箱等第三方命令插件已安装。
+**是否需要 plugin.yml libraries？**  
+不需要。本插件是胖包。
 
-**reload 会不会卡服？**  
-不会。配置文件读取、解析和校验走异步流程，运行时逻辑只读取内存快照。
+**PacketEvents 和 ProtocolLib 是否会被打进 jar？**  
+不会。二者仍需单独安装到服务器 `plugins/` 目录。
+
+**LOCAL_JSON 能用于多服吗？**  
+不能。LOCAL_JSON 只适合单服测试。

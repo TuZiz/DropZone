@@ -19,16 +19,17 @@ import ym.dropzone.entity.DropZoneEntity
 import java.util.Optional
 
 // PacketEvents 版本适配集中在这里，业务层只调用 PacketEntityAdapter。
-class PacketEventsEntityAdapter : PacketEntityAdapter {
+class PacketEventsEntityAdapter(
+    private val debugPackets: () -> Boolean
+) : PacketEntityAdapter {
     override fun spawnItemEntity(player: Player, entity: DropZoneEntity) {
         val loc = armorStandLocation(entity.currentLocation)
-        player.server.logger.info(
-            "[DropZone] spawnArmorStandHead: player=${player.name}, " +
-                "entityId=${entity.runtimeEntityId}, " +
-                "item=${entity.itemStack.type}, " +
-                "amount=${entity.itemStack.amount}, " +
-                "loc=${loc.world?.name} ${loc.x},${loc.y},${loc.z}"
-        )
+        if (debugPackets()) {
+            player.server.logger.info(
+                "[DropZone] PacketEvents spawnArmorStandHead: player=${player.name}, " +
+                    "entityId=${entity.runtimeEntityId}, item=${entity.itemStack.type}, loc=${loc.world?.name} ${loc.x},${loc.y},${loc.z}"
+            )
+        }
         // 只向指定玩家发送假盔甲架头颅，服务端不创建真实实体或掉落物。
         val spawn = WrapperPlayServerSpawnEntity(
             entity.runtimeEntityId,

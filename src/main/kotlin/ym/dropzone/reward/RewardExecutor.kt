@@ -44,6 +44,13 @@ class RewardExecutor(
         }
     }
 
+    fun playClaimEffects(player: Player, result: RewardRollResult, snapshot: RuntimeConfigSnapshot, location: org.bukkit.Location, values: Map<String, String>) {
+        playEffects(player, snapshot, values)
+        if (result.rarity.broadcast) {
+            broadcast(snapshot, values)
+        }
+    }
+
     private fun broadcast(snapshot: RuntimeConfigSnapshot, values: Map<String, String>) {
         scheduler.runGlobal {
             Bukkit.getOnlinePlayers().forEach { target ->
