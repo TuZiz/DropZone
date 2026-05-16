@@ -106,7 +106,7 @@ spawn:
 
 任务成功后标记 `DONE`，失败会回到 `PENDING` 重试，超过最大次数标记 `FAILED`。服务器崩溃重启后仍会继续处理未完成任务。
 
-关键配置：
+关键配置位于 `reward-outbox.yml`：
 
 ```yaml
 reward-outbox:
@@ -153,6 +153,22 @@ dropzone.outbox
 插件保留 `SchedulerAdapter`。玩家操作通过 player scheduler，世界/位置操作通过 region scheduler，全局命令通过 global scheduler。`reward-command.executor` 默认是 `GLOBAL_SAFE`。
 
 部分第三方插件命令可能不完全兼容 Folia，请确认奖励命令目标插件支持当前调度方式。
+
+## 头颅显示高度调整
+
+ProtocolLib 假头颅通过客户端假 ArmorStand 头盔显示，可以在 `fake-entity.yml` 调整载体参数：
+
+```yaml
+fake-entity:
+  armor-stand-y-offset: -0.85
+  armor-stand-small: true
+  armor-stand-marker: false
+```
+
+- 头颅卡进方块：把 `armor-stand-y-offset` 从 `-0.85` 调到 `-0.65`。
+- 头颅太高：把 `armor-stand-y-offset` 从 `-0.85` 调到 `-1.05`。
+- 仍看不到：临时打开 `debug-visible-armorstand: true` 和 `debug-packets: true` 排查。
+- 排查完成后记得关闭 `debug-packets`，避免控制台刷发包日志。
 
 ## 常见问题
 

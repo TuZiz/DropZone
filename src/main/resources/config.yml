@@ -65,16 +65,6 @@ reward-command:
   # GLOBAL_SAFE 是默认安全模式；PLAYER_REGION 仅用于明确支持 Folia player region 的命令。
   executor: "GLOBAL_SAFE"
 
-reward-outbox:
-  enabled: true
-  poll-interval-seconds: 2
-  max-attempts: 5
-  claim-batch-size: 20
-  # PROCESSING 超过该时间会恢复为 PENDING，避免崩服后永久卡住。
-  processing-timeout-seconds: 60
-  # CURRENT_SERVER 只消费本服任务；SAME_GROUP 消费同组任务；ANY_SERVER 允许任意服务器消费。
-  consume-mode: "CURRENT_SERVER"
-
 spawn:
   enabled: true
   # LOCAL_ONLY 为单服生成；DATABASE_LOCK 通过 MySQL 锁避免多服同时生成。
@@ -92,44 +82,41 @@ spawn:
     near-radius: 3
     respect-region: false
 
-fake-entity:
-  packet-backend: "protocolib"
-  debug-packets: false
-  debug-visible-armorstand: false
-  view-distance: 48.0
-  attract-distance: 3.0
-  pickup-distance: 0.7
-  fly-speed: 0.22
-  update-interval-ticks: 2
-  bobbing: true
-  bobbing-height: 0.25
-  rotate: true
-  rotation-speed: 6.0
-  glow-by-rarity: true
-  default-glow: false
-
 navigation:
+  # 奖励点导航提示。开启后玩家 ActionBar 会显示最近奖励点的方向、距离和坐标。
+  # 如果你希望奖励点更“靠玩家自己找”，可以把 enabled 改为 false。
   actionbar:
     enabled: true
+    # 导航刷新间隔，单位 tick。20 tick = 1 秒。
     interval-ticks: 20
+    # 超过这个距离就不显示导航；0 表示不限制距离。
     max-distance: 0.0
 
 effects:
+  # 奖励点待机时的环境粒子，用来让远处玩家更容易发现奖励点。
   idle-particle:
     enabled: true
+    # 粒子名称，需使用当前服务端版本支持的 Bukkit 粒子名。
     name: "END_ROD"
+    # 粒子播放间隔，单位 tick。数值越小越明显，也越频繁。
     interval-ticks: 10
+    # 每次播放的粒子数量。
     count: 2
+    # 粒子散布范围，数值越大扩散越明显。
     offset-x: 0.18
     offset-y: 0.18
     offset-z: 0.18
+    # 粒子速度，一般保持很小即可。
     speed: 0.01
+  # 玩家领取成功时播放的反馈效果。
   claim:
+    # 领取音效。
     sound:
       enabled: true
       name: "ENTITY_PLAYER_LEVELUP"
       volume: 1.0
       pitch: 1.2
+    # 领取粒子。
     particle:
       enabled: true
       name: "VILLAGER_HAPPY"
@@ -138,11 +125,13 @@ effects:
       offset-y: 0.6
       offset-z: 0.4
       speed: 0.02
+    # 领取成功时显示的标题，具体文字在 lang/zh_cn.yml。
     title:
       enabled: true
       fade-in: 10
       stay: 40
       fade-out: 10
+    # 领取成功时显示的 ActionBar，具体文字在 lang/zh_cn.yml。
     actionbar:
       enabled: true
 

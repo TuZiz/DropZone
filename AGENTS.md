@@ -16,7 +16,7 @@
 
 1. 先读 `README.md`，确认安装方式、运行依赖和兼容边界。
 2. 再读 `pom.xml` 与 `src/main/resources/plugin.yml`，确认 Java/Kotlin 版本、shade/relocate 策略、ProtocolLib/PlaceholderAPI 外置依赖。
-3. 配置行为从 `src/main/resources/config.yml`、`action/<活动名>/config.yml`、`heads.yml`、`rewards.yml`、`lang/zh_cn.yml` 开始读。
+3. 配置行为从 `src/main/resources/config.yml`、`fake-entity.yml`、`reward-outbox.yml`、`action/<活动名>/config.yml`、`heads.yml`、`rewards.yml`、`lang/zh_cn.yml` 开始读。
 4. 生命周期入口读 `src/main/kotlin/ym/dropzone/DropZonePlugin.kt`。
 5. 配置快照与 YAML 解析读 `config/ConfigManager.kt` 和 `config/ConfigModels.kt`。
 6. MySQL 存储、迁移、事务、outbox 读 `storage/MysqlStorage.kt` 和 `storage/StorageModels.kt`。

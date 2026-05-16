@@ -57,7 +57,10 @@ private class SwitchingPacketEntityAdapter(
         return ProtocolLibEntityAdapter(
             plugin = plugin,
             debugPackets = { configManager.snapshot?.main?.fakeEntity?.debugPackets ?: false },
-            debugVisibleArmorStand = { configManager.snapshot?.main?.fakeEntity?.debugVisibleArmorStand ?: false }
+            debugVisibleArmorStand = { configManager.snapshot?.main?.fakeEntity?.debugVisibleArmorStand ?: false },
+            armorStandYOffset = { configManager.snapshot?.main?.fakeEntity?.armorStandYOffset ?: -0.85 },
+            armorStandSmall = { configManager.snapshot?.main?.fakeEntity?.armorStandSmall ?: true },
+            armorStandMarker = { configManager.snapshot?.main?.fakeEntity?.armorStandMarker ?: false }
         ).also {
             protocolLibAdapter = it
             plugin.logger.info("[DropZone] Fake entity packet backend initialized: PROTOCOLLIB")

@@ -24,7 +24,10 @@ import kotlin.math.roundToInt
 class ProtocolLibEntityAdapter(
     private val plugin: JavaPlugin,
     private val debugPackets: () -> Boolean,
-    private val debugVisibleArmorStand: () -> Boolean
+    private val debugVisibleArmorStand: () -> Boolean,
+    private val armorStandYOffset: () -> Double,
+    private val armorStandSmall: () -> Boolean,
+    private val armorStandMarker: () -> Boolean
 ) : PacketEntityAdapter {
     private val sentLocations = ConcurrentHashMap<Int, Location>()
 
@@ -33,11 +36,17 @@ class ProtocolLibEntityAdapter(
         sentLocations[entity.runtimeEntityId] = loc.clone()
         if (debugPackets()) {
             player.server.logger.info(
-                "[DropZone] ProtocolLib spawnArmorStandHead: player=${player.name}, " +
-                    "entityId=${entity.runtimeEntityId}, " +
-                    "item=${entity.itemStack.type}, " +
-                    "amount=${entity.itemStack.amount}, " +
-                    "loc=${loc.world?.name} ${loc.x},${loc.y},${loc.z}"
+                "[DropZone] ProtocolLib spawnArmorStandHead:\n" +
+                    "backend=PROTOCOLLIB,\n" +
+                    "player=${player.name},\n" +
+                    "entityId=${entity.runtimeEntityId},\n" +
+                    "spawnLocation=${formatLocation(entity.currentLocation)},\n" +
+                    "armorStandLocation=${formatLocation(loc)},\n" +
+                    "offset=${armorStandYOffset()},\n" +
+                    "small=${armorStandSmall()},\n" +
+                    "marker=${armorStandMarker()},\n" +
+                    "debugVisibleArmorStand=${debugVisibleArmorStand()},\n" +
+                    "item=${entity.itemStack.type}"
             )
         }
 
@@ -106,7 +115,7 @@ class ProtocolLibEntityAdapter(
                 metadataOptionalChatComponent(2, Optional.of(WrappedChatComponent.fromLegacyText(hologramText(entity)))),
                 metadataBoolean(3, true),
                 metadataBoolean(5, true),
-                metadataByte(15, ARMOR_STAND_FLAG_SMALL_MARKER)
+                metadataByte(15, armorStandFlags())
             )
         )
     }
@@ -195,7 +204,19 @@ class ProtocolLibEntityAdapter(
     }
 
     private fun armorStandLocation(location: Location): Location {
-        return location.clone().add(0.0, -0.85, 0.0)
+        return location.clone().add(0.0, armorStandYOffset(), 0.0)
+    }
+
+    private fun armorStandFlags(): Byte {
+        // ArmorStand 第 15 位元数据：small=0x01，marker=0x10；marker 默认关闭，减少客户端裁剪问题。
+        var flags = 0
+        if (armorStandSmall()) flags = flags or 0x01
+        if (armorStandMarker()) flags = flags or 0x10
+        return flags.toByte()
+    }
+
+    private fun formatLocation(location: Location): String {
+        return "${location.world?.name} ${"%.2f".format(location.x)},${"%.2f".format(location.y)},${"%.2f".format(location.z)}"
     }
 
     private fun angle(value: Double): Byte {
@@ -245,7 +266,6 @@ class ProtocolLibEntityAdapter(
     private companion object {
         const val ENTITY_FLAG_INVISIBLE: Byte = 0x20
         const val ENTITY_FLAG_GLOWING: Byte = 0x40
-        const val ARMOR_STAND_FLAG_SMALL_MARKER: Byte = 0x11
         const val RELATIVE_MOVE_SCALE = 4096.0
     }
 }

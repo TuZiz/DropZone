@@ -1,0 +1,20 @@
+# DropZone 发奖 outbox 配置
+# 领取事务成功后先写入 MySQL outbox，再由 worker 安全调度执行命令。
+
+reward-outbox:
+  enabled: true
+
+  # 每隔多少秒尝试领取一批待发奖任务。
+  poll-interval-seconds: 2
+
+  # 单条奖励命令队列最多重试次数。
+  max-attempts: 5
+
+  # 每轮最多处理多少条，避免一次性执行太多控制台命令。
+  claim-batch-size: 20
+
+  # PROCESSING 超过该时间会恢复为 PENDING，避免崩服后永久卡住。
+  processing-timeout-seconds: 60
+
+  # CURRENT_SERVER 只消费本服任务；SAME_GROUP 消费同组任务；ANY_SERVER 允许任意服务器消费。
+  consume-mode: "CURRENT_SERVER"

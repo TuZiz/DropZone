@@ -11,6 +11,7 @@ import ym.dropzone.storage.ActivityStateStore
 import ym.dropzone.util.SafeEnumParser
 import java.io.File
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class ConfigManager(
@@ -21,6 +22,7 @@ class ConfigManager(
     private val langRef = AtomicReference<LangConfig?>()
     private val activityNamesRef = AtomicReference<List<String>>(emptyList())
     private val activityStateStoreRef = AtomicReference<ActivityStateStore?>()
+    private val packetEventsRemovedWarning = AtomicBoolean(false)
     val snapshot: RuntimeConfigSnapshot? get() = snapshotRef.get()
     val lang: LangConfig? get() = snapshotRef.get()?.lang ?: langRef.get()
     val activityNames: List<String> get() = activityNamesRef.get()
@@ -35,6 +37,17 @@ class ConfigManager(
         ).forEach { path ->
             val target = File(plugin.dataFolder, path)
             if (!target.exists()) plugin.saveResource(path, false)
+        }
+        saveSplitConfigIfNeeded("fake-entity.yml", "fake-entity")
+        saveSplitConfigIfNeeded("reward-outbox.yml", "reward-outbox")
+    }
+
+    private fun saveSplitConfigIfNeeded(path: String, legacySection: String) {
+        val target = File(plugin.dataFolder, path)
+        if (target.exists()) return
+        val rootYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
+        if (!rootYaml.isConfigurationSection(legacySection)) {
+            plugin.saveResource(path, false)
         }
     }
 
@@ -68,7 +81,7 @@ class ConfigManager(
         scheduler.runAsync {
             runCatching {
                 val safeName = sanitizeActivityName(activityName)
-                val mainYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
+                val mainYaml = loadRootWithSplitConfigs()
                 val files = parseActivityFiles(mainYaml)
                 val storage = parseStateStorage(mainYaml)
                 val store = activityStateStoreRef.get()
@@ -84,7 +97,7 @@ class ConfigManager(
 
     private fun loadSnapshot(): RuntimeConfigSnapshot {
         // reload 会一次性构建新快照；构建失败时旧快照继续服务运行逻辑。
-        val mainYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
+        val mainYaml = loadRootWithSplitConfigs()
         val files = parseActivityFiles(mainYaml)
         val storage = parseStateStorage(mainYaml)
         val activityStateStore = activityStateStoreRef.get()
@@ -158,6 +171,23 @@ class ConfigManager(
         )
     }
 
+    private fun loadRootWithSplitConfigs(): YamlConfiguration {
+        val yaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
+        // 新拆分文件存在时优先生效；不存在时继续吃旧 config.yml 里的同名节点。
+        overlaySplitSection(yaml, "fake-entity.yml", "fake-entity")
+        overlaySplitSection(yaml, "reward-outbox.yml", "reward-outbox")
+        return yaml
+    }
+
+    private fun overlaySplitSection(root: YamlConfiguration, fileName: String, sectionName: String) {
+        val file = File(plugin.dataFolder, fileName)
+        if (!file.exists()) return
+        val split = YamlConfiguration.loadConfiguration(file)
+        val section = split.getConfigurationSection(sectionName) ?: return
+        // 直接覆盖整段，避免同一节点一半来自旧文件、一半来自新文件导致排查困难。
+        root.set(sectionName, section)
+    }
+
     private fun parseStateStorage(yaml: YamlConfiguration): StateStorageConfig {
         val modeText = yaml.getString("storage.mode", yaml.getString("state-storage.mode", "LOCAL_JSON")) ?: "LOCAL_JSON"
         val mode = SafeEnumParser.parse<StorageMode>(modeText)
@@ -181,7 +211,7 @@ class ConfigManager(
     }
 
     private fun loadMainConfig(): MainConfig {
-        val mainYaml = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, ROOT_CONFIG_FILE))
+        val mainYaml = loadRootWithSplitConfigs()
         val language = mainYaml.getString("settings.language", "zh_CN") ?: "zh_CN"
         val langFile = File(plugin.dataFolder, "lang/${language.lowercase()}.yml").takeIf { it.exists() } ?: File(plugin.dataFolder, "lang/zh_cn.yml")
         val lang = parseLang(YamlConfiguration.loadConfiguration(langFile))
@@ -251,6 +281,9 @@ class ConfigManager(
         }
         val packetBackendText = yaml.getString("fake-entity.packet-backend", "PROTOCOLLIB")
         val packetBackend = SafeEnumParser.parse<PacketBackend>(packetBackendText) ?: PacketBackend.PROTOCOLLIB
+        if (packetBackendText.equals("packetevents", ignoreCase = true) && packetEventsRemovedWarning.compareAndSet(false, true)) {
+            plugin.logger.warning("[DropZone] PacketEvents backend has been removed. Falling back to ProtocolLib. Please update fake-entity.packet-backend to \"protocolib\".")
+        }
         return MainConfig(
             debug = yaml.getBoolean("settings.debug", false),
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
@@ -302,6 +335,9 @@ class ConfigManager(
                 packetBackend = packetBackend,
                 debugPackets = yaml.getBoolean("fake-entity.debug-packets", false),
                 debugVisibleArmorStand = yaml.getBoolean("fake-entity.debug-visible-armorstand", false),
+                armorStandYOffset = yaml.getDouble("fake-entity.armor-stand-y-offset", -0.85),
+                armorStandSmall = yaml.getBoolean("fake-entity.armor-stand-small", true),
+                armorStandMarker = yaml.getBoolean("fake-entity.armor-stand-marker", false),
                 viewDistance = yaml.getDouble("fake-entity.view-distance", 48.0),
                 attractDistance = yaml.getDouble("fake-entity.attract-distance", 6.0),
                 pickupDistance = yaml.getDouble("fake-entity.pickup-distance", 1.2),
@@ -533,17 +569,6 @@ class ConfigManager(
         private val ACTIVITY_NAME = Regex("[A-Za-z0-9_-]+")
         private val FILE_NAME = Regex("[A-Za-z0-9_.-]+")
         private val RELATIVE_PATH = Regex("[A-Za-z0-9_./-]+")
-        private val DEFAULT_LANG_MESSAGES = mapOf(
-            LangKeys.NAVIGATION_ACTIONBAR to "<#FFD700>最近奖励点 <#FFFFFF>%distance%m <#AAAAAA>| <#55FFFF>%direction% <#AAAAAA>| <#FFFFFF>%world% %x%, %y%, %z% <#AAAAAA>| <head>",
-            LangKeys.NAVIGATION_ACTIONBAR_EMPTY to "<#AAAAAA>等待奖励点生成中...",
-            LangKeys.DIRECTION_FRONT to "<#55FF55>前方",
-            LangKeys.DIRECTION_FRONT_LEFT to "<#55FF55>左前",
-            LangKeys.DIRECTION_LEFT to "<#55FF55>左侧",
-            LangKeys.DIRECTION_BACK_LEFT to "<#55FF55>左后",
-            LangKeys.DIRECTION_BACK to "<#55FF55>后方",
-            LangKeys.DIRECTION_BACK_RIGHT to "<#55FF55>右后",
-            LangKeys.DIRECTION_RIGHT to "<#55FF55>右侧",
-            LangKeys.DIRECTION_FRONT_RIGHT to "<#55FF55>右前"
-        )
+        private val DEFAULT_LANG_MESSAGES = emptyMap<String, String>()
     }
 }
