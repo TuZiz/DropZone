@@ -77,13 +77,13 @@ spawn:
     # /dz spawn 的位置模式：
     # REGION_RANDOM：按当前活动 spawn-region 范围随机生成。
     # PLAYER_NEAR：优先在执行玩家附近生成，适合测试头颅显示。
-    mode: "REGION_RANDOM"
+    mode: "PLAYER_NEAR"
     # /dz spawn 不带数量时默认生成几个。
-    amount: 3
+    amount: 1
     # /dz spawn <数量> 允许的最大数量，防止误刷。
     max-amount: 20
     # PLAYER_NEAR 模式下，在玩家附近多少格内找位置。
-    near-radius: 24
+    near-radius: 3
     # PLAYER_NEAR 模式下是否仍要求 x/z 落在活动 spawn-region 内。
     respect-region: false
 
@@ -91,14 +91,15 @@ fake-entity:
   # 发包后端二选一：protocollib / packetevents
   packet-backend: "protocollib"
   debug-packets: true
+  debug-visible-armorstand: false
   # 玩家进入该距离后才会收到假实体数据包。
   view-distance: 48.0
   # 玩家进入该距离后头颅开始吸附。
-  attract-distance: 6.0
+  attract-distance: 3.0
   # 头颅距离玩家小于该值时完成领取。
-  pickup-distance: 1.2
+  pickup-distance: 0.7
   # 吸附飞行速度，数值越大飞得越快。
-  fly-speed: 0.35
+  fly-speed: 0.22
   # 假实体更新间隔，单位 tick。
   update-interval-ticks: 2
   bobbing: true

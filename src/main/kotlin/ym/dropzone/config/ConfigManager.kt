@@ -242,6 +242,7 @@ class ConfigManager(
             fakeEntity = FakeEntityConfig(
                 packetBackend = packetBackend,
                 debugPackets = yaml.getBoolean("fake-entity.debug-packets", true),
+                debugVisibleArmorStand = yaml.getBoolean("fake-entity.debug-visible-armorstand", false),
                 viewDistance = yaml.getDouble("fake-entity.view-distance", 48.0),
                 attractDistance = yaml.getDouble("fake-entity.attract-distance", 6.0),
                 pickupDistance = yaml.getDouble("fake-entity.pickup-distance", 1.2),

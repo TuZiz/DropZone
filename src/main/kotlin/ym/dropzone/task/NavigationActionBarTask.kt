@@ -29,6 +29,7 @@ class NavigationActionBarTask(
         val snapshot = configManager.snapshot ?: return
         val navigation = snapshot.main.navigation
         if (!navigation.actionbarEnabled) return
+        if (!snapshot.activity.enabled) return
 
         val entities = entityManager.activeEntities().mapNotNull { entity ->
             val worldUid = entity.worldUid ?: return@mapNotNull null
@@ -44,6 +45,7 @@ class NavigationActionBarTask(
                 roll = entity.roll
             )
         }
+        if (entities.isEmpty()) return
 
         for (playerId in playerSnapshots.trackedIds()) {
             scheduler.runForPlayer(playerId) { player ->

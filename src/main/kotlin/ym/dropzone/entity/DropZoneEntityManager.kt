@@ -37,7 +37,7 @@ class DropZoneEntityManager(
     private val headFactory: HeadFactory
 ) {
     private val entities = ConcurrentHashMap<UUID, DropZoneEntity>()
-    private val nextRuntimeId = AtomicInteger(900_000)
+    private val nextRuntimeId = AtomicInteger(-1)
 
     fun activeCount(): Int = entities.size
     fun activeEntities(): List<DropZoneEntity> = entities.values.toList()
@@ -85,7 +85,7 @@ class DropZoneEntityManager(
         val item = headFactory.create(roll.head)
         val entity = DropZoneEntity(
             id = UUID.randomUUID(),
-            runtimeEntityId = nextRuntimeId.incrementAndGet(),
+            runtimeEntityId = nextRuntimeId.getAndDecrement(),
             roll = roll,
             itemStack = item,
             spawnLocation = location.clone(),
@@ -124,12 +124,14 @@ class DropZoneEntityManager(
                 val visible = viewerSnapshot.distanceSquared(current.x, current.y, current.z) <= viewDistanceSquared
                 if (visible) {
                     showOrUpdate(viewerSnapshot.uuid, entity)
-                } else {
-                    hideViewer(viewerSnapshot.uuid, entity)
+                } else if (viewerSnapshot.uuid in entity.visibleTo) {
+                    validateViewerLive(viewerSnapshot.uuid, entity, worldUid, current.clone(), viewDistanceSquared, snapshot)
                 }
             }
             entity.visibleTo.toList().forEach { viewerId ->
-                if (viewerId !in seen) hideViewer(viewerId, entity)
+                if (viewerId !in seen) {
+                    validateViewerLive(viewerId, entity, worldUid, current.clone(), viewDistanceSquared, snapshot)
+                }
             }
         }
     }
@@ -290,6 +292,49 @@ class DropZoneEntityManager(
     private fun hideViewer(playerId: UUID, entity: DropZoneEntity) {
         if (!entity.visibleTo.remove(playerId)) return
         destroyForViewer(playerId, entity.runtimeEntityId)
+    }
+
+    private fun validateViewerLive(
+        playerId: UUID,
+        entity: DropZoneEntity,
+        worldUid: UUID,
+        current: Location,
+        viewDistanceSquared: Double,
+        snapshot: RuntimeConfigSnapshot
+    ) {
+        val handle = scheduler.runForPlayer(playerId) { player ->
+            if (!entities.containsKey(entity.id)) {
+                entity.visibleTo.remove(playerId)
+                return@runForPlayer
+            }
+            if (!player.isOnline) {
+                entity.visibleTo.remove(playerId)
+                return@runForPlayer
+            }
+            if (player.world.uid != worldUid) {
+                destroyVisibleViewer(player, entity, snapshot, "OUT_OF_RANGE_OR_WORLD")
+                return@runForPlayer
+            }
+            val stillVisible = player.location.distanceSquared(current) <= viewDistanceSquared
+            if (stillVisible) {
+                showOrUpdate(player.uniqueId, entity)
+            } else {
+                destroyVisibleViewer(player, entity, snapshot, "OUT_OF_RANGE_OR_WORLD")
+            }
+        }
+        if (handle == null) {
+            entity.visibleTo.remove(playerId)
+        }
+    }
+
+    private fun destroyVisibleViewer(player: Player, entity: DropZoneEntity, snapshot: RuntimeConfigSnapshot, reason: String) {
+        if (!entity.visibleTo.remove(player.uniqueId)) return
+        if (snapshot.main.fakeEntity.debugPackets || snapshot.main.debug) {
+            plugin.logger.info(
+                "[DropZone] hideViewer: player=${player.name}, entity=${entity.runtimeEntityId}, reason=$reason"
+            )
+        }
+        packetAdapter.destroyEntity(player, entity.runtimeEntityId)
     }
 
     private fun remove(entity: DropZoneEntity, destroy: Boolean) {

@@ -107,6 +107,7 @@ data class ManualSpawnConfig(
 data class FakeEntityConfig(
     val packetBackend: PacketBackend,
     val debugPackets: Boolean,
+    val debugVisibleArmorStand: Boolean,
     val viewDistance: Double,
     val attractDistance: Double,
     val pickupDistance: Double,

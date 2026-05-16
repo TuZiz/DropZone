@@ -71,9 +71,11 @@ private class SwitchingPacketEntityAdapter(
     private fun protocolLib(): PacketEntityAdapter {
         val existing = protocolLibAdapter
         if (existing != null) return existing
-        return ProtocolLibEntityAdapter(plugin) {
-            configManager.snapshot?.main?.fakeEntity?.debugPackets ?: true
-        }.also {
+        return ProtocolLibEntityAdapter(
+            plugin = plugin,
+            debugPackets = { configManager.snapshot?.main?.fakeEntity?.debugPackets ?: true },
+            debugVisibleArmorStand = { configManager.snapshot?.main?.fakeEntity?.debugVisibleArmorStand ?: false }
+        ).also {
             protocolLibAdapter = it
             plugin.logger.info("[DropZone] Fake entity packet backend initialized: PROTOCOLLIB")
         }
