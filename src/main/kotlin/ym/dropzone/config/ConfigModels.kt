@@ -29,7 +29,8 @@ data class ActivityConfig(
     val id: String,
     val displayName: String,
     val enabled: Boolean,
-    val rules: ActivityRulesConfig
+    val rules: ActivityRulesConfig,
+    val spawnRegion: SpawnRegionConfig
 )
 
 data class ActivityRulesConfig(
@@ -101,6 +102,7 @@ object LangKeys {
     const val CONFIG_ERROR_HEAD_RARITY_MISSING = "config-error-head-rarity-missing"
     const val CONFIG_ERROR_ACTIVITY_FOLDER = "config-error-activity-folder"
     const val CONFIG_ERROR_ACTIVITY_DISABLED = "config-error-activity-disabled"
+    const val CONFIG_ERROR_ACTIVITY_SPAWN_REGION_MISSING = "config-error-activity-spawn-region-missing"
 }
 
 data class RuntimeConfigSnapshot(

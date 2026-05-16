@@ -30,21 +30,6 @@ claim:
   # 领取被拒绝后，临时忽略该玩家的秒数，避免反复靠近刷屏。
   denied-ignore-seconds: 3
 
-spawn-region:
-  # 生成世界名，不存在时本轮生成会跳过。
-  world: "world"
-  # MAX_RADIUS 使用中心点+半径；BOX 使用 min/max 边界。
-  mode: "MAX_RADIUS"
-  center-x: 0
-  center-z: 0
-  max-radius: 5000
-  min-x: -3000
-  max-x: 3000
-  min-z: -3000
-  max-z: 3000
-  min-y: 80
-  max-y: 160
-
 location-rules:
   # require-air 要求奖励点所在方块为空气。
   require-air: true

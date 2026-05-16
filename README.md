@@ -14,6 +14,7 @@ DropZone 是一个 Minecraft 奖励点插件。它会在配置区域内随机生
 - 领取后自动销毁假实体并执行奖励命令。
 - 支持稀有度、权重、公告和头颅发光。
 - 支持多个活动目录，通过 `/dz start <活动名>` 切换活动。
+- 每个活动可单独配置生成世界和生成范围。
 - 支持领取次数限制、领取冷却、禁止重复获得同一奖励。
 - 支持音效、粒子、Title、ActionBar。
 - 支持 PlaceholderAPI 变量。
@@ -49,9 +50,9 @@ plugins/DropZone/action/default/heads.yml
 plugins/DropZone/action/default/rewards.yml
 ```
 
-- `config.yml`：全局生成范围、吸附距离、奖励点表现、效果和运行策略。
+- `config.yml`：全局吸附距离、奖励点表现、效果和运行策略。
 - `lang/zh_cn.yml`：所有玩家可见消息。
-- `action/<活动名>/config.yml`：活动开关和领取规则。
+- `action/<活动名>/config.yml`：活动开关、领取规则、活动专属生成世界和范围。每个活动都必须配置 `spawn-region`。
 - `action/<活动名>/heads.yml`：头颅材质、显示名、lore、稀有度和权重。
 - `action/<活动名>/rewards.yml`：稀有度、奖励权重、公告和奖励命令。
 

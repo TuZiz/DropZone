@@ -51,3 +51,4 @@ messages:
   config-error-head-rarity-missing: "<#FF5555>头颅绑定的稀有度不存在：<#FFFFFF>%path% <#AAAAAA>-> <#FFFFFF>%value%"
   config-error-activity-folder: "<#FF5555>活动文件夹不存在：<#FFFFFF>%activity%"
   config-error-activity-disabled: "<#FF5555>活动已禁用：<#FFFFFF>%activity%"
+  config-error-activity-spawn-region-missing: "<#FF5555>活动缺少生成范围配置：<#FFFFFF>%path%"

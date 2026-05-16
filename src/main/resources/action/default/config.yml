@@ -16,3 +16,31 @@ rules:
   claim-cooldown-seconds: 0
   # 是否允许同一玩家重复抽到同一奖励。
   allow-repeat-rewards: true
+
+spawn-region:
+  # 本活动专属生成世界和范围；每个活动必须配置。
+  # 写法一：MAX_RADIUS
+  # - world 指定生成世界名，例如 world、world_nether、resource_world。
+  # - center-x / center-z 是中心点。
+  # - max-radius 是最大半径。
+  # - 实际范围为：
+  #   x = center-x - max-radius 到 center-x + max-radius
+  #   z = center-z - max-radius 到 center-z + max-radius
+  world: "world"
+  mode: "MAX_RADIUS"
+  center-x: 0
+  center-z: 0
+  max-radius: 5000
+
+  # 写法二：BOX
+  # - 如果把 mode 改成 "BOX"，插件会使用下面的最大/最小边界。
+  # - min-x / max-x 是 X 坐标最小值和最大值。
+  # - min-z / max-z 是 Z 坐标最小值和最大值。
+  # - min-y / max-y 是生成高度最小值和最大值。
+  # - 示例：min-x: -3000, max-x: 3000 表示 X 只能在 -3000 到 3000 之间。
+  min-x: -3000
+  max-x: 3000
+  min-z: -3000
+  max-z: 3000
+  min-y: 80
+  max-y: 160

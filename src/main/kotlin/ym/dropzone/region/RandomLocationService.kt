@@ -17,20 +17,21 @@ class RandomLocationService(
         // 坐标候选基于内存快照，区块和方块检查切回安全调度器。
         val future = CompletableFuture<Location?>()
         scheduler.runGlobal {
-            val world = Bukkit.getWorld(snapshot.main.spawnRegion.world)
+            val spawnRegion = snapshot.activity.spawnRegion
+            val world = Bukkit.getWorld(spawnRegion.world)
             if (world == null) {
-                plugin.logger.warning(snapshot.lang.format(LangKeys.CONSOLE_INVALID_WORLD, mapOf("world" to snapshot.main.spawnRegion.world)))
+                plugin.logger.warning(snapshot.lang.format(LangKeys.CONSOLE_INVALID_WORLD, mapOf("world" to spawnRegion.world)))
                 future.complete(null)
                 return@runGlobal
             }
-            val region = SpawnRegion(snapshot.main.spawnRegion)
+            val region = SpawnRegion(spawnRegion)
             attempt(snapshot, region, 0, future)
         }
         return future
     }
 
     private fun attempt(snapshot: RuntimeConfigSnapshot, region: SpawnRegion, index: Int, future: CompletableFuture<Location?>) {
-        val world = Bukkit.getWorld(snapshot.main.spawnRegion.world)
+        val world = Bukkit.getWorld(snapshot.activity.spawnRegion.world)
         if (world == null || index >= snapshot.main.locationRules.maxLocationAttempts) {
             future.complete(null)
             return

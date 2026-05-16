@@ -50,7 +50,7 @@ class DropZonePlaceholderExpansion(
             "spawn_enabled" -> snapshot.main.spawn.enabled.toString()
             "spawn_interval", "spawn_interval_seconds" -> snapshot.main.spawn.intervalSeconds.toString()
             "despawn_seconds" -> snapshot.main.spawn.despawnSeconds.toString()
-            "world" -> snapshot.main.spawnRegion.world
+            "world" -> snapshot.activity.spawnRegion.world
             "selection_mode" -> snapshot.main.rewardSelectionMode.name
             "language" -> snapshot.main.language
             "rarities", "rarity_count" -> snapshot.rarities.size.toString()

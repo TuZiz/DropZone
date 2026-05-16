@@ -95,13 +95,13 @@ class ConfigManager(
             errors += issue(lang, LangKeys.CONFIG_ERROR_ACTIVITY_FOLDER, "activity" to activeActivity)
         }
         val activityYaml = YamlConfiguration.loadConfiguration(File(activityFolder, files.configFile))
-        val activity = parseActivity(activeActivity, activityYaml)
+        val main = parseMain(mainYaml, lang, errors)
+        val activity = parseActivity(activeActivity, activityYaml, lang, errors)
         if (!activity.enabled) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_ACTIVITY_DISABLED, "activity" to activeActivity)
         }
         val headsYaml = YamlConfiguration.loadConfiguration(File(activityFolder, files.headsFile))
         val rewardsYaml = YamlConfiguration.loadConfiguration(File(activityFolder, files.rewardsFile))
-        val main = parseMain(mainYaml, lang, errors)
         val rarities = parseRarities(rewardsYaml, lang, errors)
         val rewards = parseRewards(rewardsYaml, rarities.keys, lang, errors)
         val heads = parseHeads(headsYaml, rarities.keys, lang, warnings, errors)
@@ -149,7 +149,12 @@ class ConfigManager(
         )
     }
 
-    private fun parseActivity(id: String, yaml: YamlConfiguration): ActivityConfig {
+    private fun parseActivity(
+        id: String,
+        yaml: YamlConfiguration,
+        lang: LangConfig,
+        errors: MutableList<String>
+    ): ActivityConfig {
         return ActivityConfig(
             id = id,
             displayName = yaml.getString("activity.display-name", id) ?: id,
@@ -159,17 +164,27 @@ class ConfigManager(
                 maxClaimsPerPlayer = yaml.getInt("rules.max-claims-per-player", 0).coerceAtLeast(0),
                 claimCooldownSeconds = yaml.getLong("rules.claim-cooldown-seconds", 0).coerceAtLeast(0),
                 allowRepeatRewards = yaml.getBoolean("rules.allow-repeat-rewards", true)
-            )
+            ),
+            spawnRegion = parseRequiredSpawnRegion(yaml, "action.$id.spawn-region", lang, errors)
         )
+    }
+
+    private fun parseRequiredSpawnRegion(
+        yaml: YamlConfiguration,
+        pathPrefix: String,
+        lang: LangConfig,
+        errors: MutableList<String>
+    ): SpawnRegionConfig {
+        val defaults = SpawnRegionConfig("world", SpawnRegionMode.MAX_RADIUS, 0, 0, 5000, -3000, 3000, -3000, 3000, 80, 160)
+        if (!yaml.isConfigurationSection("spawn-region")) {
+            errors += issue(lang, LangKeys.CONFIG_ERROR_ACTIVITY_SPAWN_REGION_MISSING, "path" to pathPrefix)
+            return defaults
+        }
+        return parseSpawnRegion(yaml, "spawn-region", pathPrefix, defaults, lang, errors)
     }
 
     private fun parseMain(yaml: YamlConfiguration, lang: LangConfig, errors: MutableList<String>): MainConfig {
         // 主配置只解析玩法参数，不解析玩家可见文案。
-        val modeText = yaml.getString("spawn-region.mode", "MAX_RADIUS")
-        val regionMode = SafeEnumParser.parse<SpawnRegionMode>(modeText)
-        if (regionMode == null) {
-            errors += issue(lang, LangKeys.CONFIG_ERROR_REGION_MODE, "path" to "config.spawn-region.mode", "value" to modeText.orEmpty())
-        }
         val selectionText = yaml.getString("reward-selection.mode", "RARITY_THEN_REWARD")
         val selectionMode = SafeEnumParser.parse<RewardSelectionMode>(selectionText)
         if (selectionMode == null) {
@@ -180,12 +195,6 @@ class ConfigManager(
         if (commandExecutorMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_REWARD_COMMAND_EXECUTOR_MODE, "path" to "config.reward-command.executor", "value" to commandExecutorText.orEmpty())
         }
-        val minY = yaml.getInt("spawn-region.min-y", 80)
-        val maxY = yaml.getInt("spawn-region.max-y", 160)
-        if (minY > maxY) {
-            errors += issue(lang, LangKeys.CONFIG_ERROR_Y_RANGE, "min" to minY.toString(), "max" to maxY.toString())
-        }
-
         return MainConfig(
             debug = yaml.getBoolean("settings.debug", false),
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
@@ -193,19 +202,6 @@ class ConfigManager(
             stateStorage = parseStateStorage(yaml),
             claim = ClaimConfig(
                 deniedIgnoreSeconds = yaml.getLong("claim.denied-ignore-seconds", 3L).coerceAtLeast(1L)
-            ),
-            spawnRegion = SpawnRegionConfig(
-                world = yaml.getString("spawn-region.world", "world") ?: "world",
-                mode = regionMode ?: SpawnRegionMode.MAX_RADIUS,
-                centerX = yaml.getInt("spawn-region.center-x", 0),
-                centerZ = yaml.getInt("spawn-region.center-z", 0),
-                maxRadius = yaml.getInt("spawn-region.max-radius", 5000),
-                minX = yaml.getInt("spawn-region.min-x", -3000),
-                maxX = yaml.getInt("spawn-region.max-x", 3000),
-                minZ = yaml.getInt("spawn-region.min-z", -3000),
-                maxZ = yaml.getInt("spawn-region.max-z", 3000),
-                minY = minY,
-                maxY = maxY
             ),
             locationRules = LocationRulesConfig(
                 requireAir = yaml.getBoolean("location-rules.require-air", true),
@@ -273,6 +269,39 @@ class ConfigManager(
             reload = ReloadConfig(
                 clearActiveEntities = yaml.getBoolean("reload.clear-active-entities", true)
             )
+        )
+    }
+
+    private fun parseSpawnRegion(
+        yaml: YamlConfiguration,
+        sectionPath: String,
+        displayPath: String,
+        fallback: SpawnRegionConfig,
+        lang: LangConfig,
+        errors: MutableList<String>
+    ): SpawnRegionConfig {
+        val modeText = yaml.getString("$sectionPath.mode", fallback.mode.name)
+        val regionMode = SafeEnumParser.parse<SpawnRegionMode>(modeText)
+        if (regionMode == null) {
+            errors += issue(lang, LangKeys.CONFIG_ERROR_REGION_MODE, "path" to "$displayPath.mode", "value" to modeText.orEmpty())
+        }
+        val minY = yaml.getInt("$sectionPath.min-y", fallback.minY)
+        val maxY = yaml.getInt("$sectionPath.max-y", fallback.maxY)
+        if (minY > maxY) {
+            errors += issue(lang, LangKeys.CONFIG_ERROR_Y_RANGE, "min" to minY.toString(), "max" to maxY.toString())
+        }
+        return SpawnRegionConfig(
+            world = yaml.getString("$sectionPath.world", fallback.world) ?: fallback.world,
+            mode = regionMode ?: fallback.mode,
+            centerX = yaml.getInt("$sectionPath.center-x", fallback.centerX),
+            centerZ = yaml.getInt("$sectionPath.center-z", fallback.centerZ),
+            maxRadius = yaml.getInt("$sectionPath.max-radius", fallback.maxRadius),
+            minX = yaml.getInt("$sectionPath.min-x", fallback.minX),
+            maxX = yaml.getInt("$sectionPath.max-x", fallback.maxX),
+            minZ = yaml.getInt("$sectionPath.min-z", fallback.minZ),
+            maxZ = yaml.getInt("$sectionPath.max-z", fallback.maxZ),
+            minY = minY,
+            maxY = maxY
         )
     }
 

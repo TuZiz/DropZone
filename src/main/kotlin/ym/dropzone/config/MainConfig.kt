@@ -6,7 +6,6 @@ data class MainConfig(
     val activityFiles: ActivityFilesConfig,
     val stateStorage: StateStorageConfig,
     val claim: ClaimConfig,
-    val spawnRegion: SpawnRegionConfig,
     val locationRules: LocationRulesConfig,
     val rewardSelectionMode: RewardSelectionMode,
     val rewardCommandExecutorMode: RewardCommandExecutorMode,
