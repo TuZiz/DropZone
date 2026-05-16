@@ -191,7 +191,7 @@ class DropZoneEntityManager(
             if (now >= entity.expiresAtMillis && entity.state.compareAndSet(DropZoneEntityState.WAITING, DropZoneEntityState.EXPIRED)) {
                 mysqlStorage?.markExpired(entity.id)?.whenComplete { _, error ->
                     if (error != null) {
-                        plugin.logger.warning("DropZone MySQL expire failed: server=${configManager.snapshot?.main?.server?.id}, activity=${snapshot.activity.id}, spawnId=${entity.id}, rewardId=${entity.roll.reward.id}, error=${error.message ?: error.javaClass.simpleName}")
+                        plugin.logger.warning("[DropZone] MySQL 标记奖励点过期失败: server.id=${configManager.snapshot?.main?.server?.id}, activity_id=${snapshot.activity.id}, spawn_id=${entity.id}, reward_id=${entity.roll.reward.id}, error=${error.message ?: error.javaClass.simpleName}")
                     }
                 }
                 scheduler.runAt(entity.currentLocation) { remove(entity, destroy = true) }
@@ -482,7 +482,7 @@ class DropZoneEntityManager(
         if (!entity.visibleTo.remove(player.uniqueId)) return
         if (snapshot.main.fakeEntity.debugPackets || snapshot.main.debug) {
             plugin.logger.info(
-                "[DropZone] hideViewer: player=${player.name}, entity=${entity.runtimeEntityId}, reason=$reason"
+                "[DropZone] 隐藏假实体: 玩家=${player.name}, 实体ID=${entity.runtimeEntityId}, 原因=$reason"
             )
         }
         packetAdapter.destroyEntity(player, entity.runtimeEntityId)

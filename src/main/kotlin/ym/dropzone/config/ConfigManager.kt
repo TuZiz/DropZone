@@ -280,18 +280,25 @@ class ConfigManager(
             errors += issue(lang, LangKeys.CONFIG_ERROR_MANUAL_SPAWN_MODE, "path" to "config.spawn.manual.mode", "value" to manualModeText.orEmpty())
         }
         val packetBackendText = yaml.getString("fake-entity.packet-backend", "PROTOCOLLIB")
+        val legacyPacketEventsConfigured = packetBackendText.equals("packetevents", ignoreCase = true)
         val packetBackend = SafeEnumParser.parse<PacketBackend>(packetBackendText) ?: PacketBackend.PROTOCOLLIB
-        if (packetBackendText.equals("packetevents", ignoreCase = true) && packetEventsRemovedWarning.compareAndSet(false, true)) {
-            plugin.logger.warning("[DropZone] PacketEvents backend has been removed. Falling back to ProtocolLib. Please update fake-entity.packet-backend to \"protocolib\".")
+        if (legacyPacketEventsConfigured && packetEventsRemovedWarning.compareAndSet(false, true)) {
+            val context = "server.id=${yaml.getString("server.id", "server-1")}, " +
+                "server.group=${yaml.getString("server.group", "main")}, " +
+                "storage.mode=${yaml.getString("storage.mode", yaml.getString("state-storage.mode", "LOCAL_JSON"))}, " +
+                "activity_id=${yaml.getString("action.default-activity", "default")}"
+            plugin.logger.warning("[DropZone] PacketEvents 后端已移除，当前已回退到 ProtocolLib。请把 fake-entity.packet-backend 改为 \"protocolib\"。($context)")
         }
+        val rawServerId = yaml.getString("server.id", "server-1") ?: "server-1"
+        val rawServerGroup = yaml.getString("server.group", "main") ?: "main"
         return MainConfig(
             debug = yaml.getBoolean("settings.debug", false),
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
             activityFiles = parseActivityFiles(yaml),
             stateStorage = parseStateStorage(yaml),
             server = ServerConfig(
-                id = yaml.getString("server.id", "server-1")?.trim().orEmpty().ifBlank { "server-1" },
-                group = yaml.getString("server.group", "main")?.trim().orEmpty().ifBlank { "main" }
+                id = rawServerId.trim(),
+                group = rawServerGroup.trim()
             ),
             crossServer = CrossServerConfig(
                 enabled = yaml.getBoolean("cross-server.enabled", false),
@@ -333,6 +340,7 @@ class ConfigManager(
             ),
             fakeEntity = FakeEntityConfig(
                 packetBackend = packetBackend,
+                legacyPacketEventsConfigured = legacyPacketEventsConfigured,
                 debugPackets = yaml.getBoolean("fake-entity.debug-packets", false),
                 debugVisibleArmorStand = yaml.getBoolean("fake-entity.debug-visible-armorstand", false),
                 armorStandYOffset = yaml.getDouble("fake-entity.armor-stand-y-offset", -0.85),
@@ -413,6 +421,12 @@ class ConfigManager(
         }
         if (main.stateStorage.mode == StorageMode.MYSQL && main.stateStorage.mysql.database.isBlank()) {
             throw IllegalStateException("storage.mysql.database must not be blank")
+        }
+        if (main.stateStorage.mode == StorageMode.MYSQL && main.server.id.isBlank()) {
+            throw IllegalStateException("storage.mode=MYSQL requires server.id to be non-blank")
+        }
+        if (main.stateStorage.mode == StorageMode.MYSQL && main.server.group.isBlank()) {
+            throw IllegalStateException("storage.mode=MYSQL requires server.group to be non-blank")
         }
         if (main.crossServer.enabled && main.spawn.crossServerMode != SpawnCrossServerMode.DATABASE_LOCK) {
             throw IllegalStateException("cross-server.enabled=true requires spawn.cross-server-mode=DATABASE_LOCK")

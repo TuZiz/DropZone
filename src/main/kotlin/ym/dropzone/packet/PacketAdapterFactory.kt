@@ -63,7 +63,7 @@ private class SwitchingPacketEntityAdapter(
             armorStandMarker = { configManager.snapshot?.main?.fakeEntity?.armorStandMarker ?: false }
         ).also {
             protocolLibAdapter = it
-            plugin.logger.info("[DropZone] Fake entity packet backend initialized: PROTOCOLLIB")
+            plugin.logger.info("[DropZone] 假实体发包后端已初始化: PROTOCOLLIB")
         }
     }
 
@@ -73,7 +73,7 @@ private class SwitchingPacketEntityAdapter(
 
     private fun severeOnce() {
         if (warned.add("missing-protocollib")) {
-            plugin.logger.severe("[DropZone] ProtocolLib is not installed; fake entity packets are disabled.")
+            plugin.logger.severe("[DropZone] ProtocolLib 未安装，假实体发包已停用。")
         }
     }
 }

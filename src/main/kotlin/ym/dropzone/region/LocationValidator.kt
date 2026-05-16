@@ -16,7 +16,7 @@ class LocationValidator(private val plugin: Plugin) {
         if (!world.isChunkLoaded(chunkX, chunkZ)) {
             if (rules.loadChunkIfNeeded || rules.maxSyncChunkLoadsPerCycle > 0) {
                 if (chunkLoadWarningSent.compareAndSet(false, true)) {
-                    plugin.logger.warning("DropZone skipped unloaded chunk validation. Sync chunk loading is disabled for server safety.")
+                    plugin.logger.warning("[DropZone] 已跳过未加载区块校验。为保证服务器安全，同步区块加载已禁用。")
                 }
             }
             return false

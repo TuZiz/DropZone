@@ -34,7 +34,7 @@ class RewardOutboxWorker(
         }.whenComplete { entries, error ->
             if (error != null) {
                 running = false
-                plugin.logger.warning("DropZone outbox scan failed: server=${snapshot.main.server.id}, group=${snapshot.main.server.group}, activity=${snapshot.activity.id}, error=${error.message ?: error.javaClass.simpleName}")
+                plugin.logger.warning("[DropZone] 发奖队列扫描失败: server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}, activity_id=${snapshot.activity.id}, error=${error.message ?: error.javaClass.simpleName}")
                 return@whenComplete
             }
             val batch = entries.orEmpty()
@@ -61,9 +61,9 @@ class RewardOutboxWorker(
                     finish.whenComplete { _, finishError ->
                         if (finishError != null) {
                             plugin.logger.warning(
-                                "DropZone outbox update failed: server=${snapshot.main.server.id}, group=${snapshot.main.server.group}, " +
-                                    "activity=${entry.activityId}, spawnId=${entry.spawnId}, playerUuid=${entry.playerUuid}, " +
-                                    "rewardId=${entry.rewardId}, outboxId=${entry.id}, error=${finishError.message ?: finishError.javaClass.simpleName}"
+                                "[DropZone] 发奖队列状态更新失败: server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}, " +
+                                    "activity_id=${entry.activityId}, spawn_id=${entry.spawnId}, player_uuid=${entry.playerUuid}, " +
+                                    "reward_id=${entry.rewardId}, outbox_id=${entry.id}, error=${finishError.message ?: finishError.javaClass.simpleName}"
                             )
                         }
                         remaining -= 1

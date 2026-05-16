@@ -1,5 +1,5 @@
 name: DropZone
-version: ${project.version}
+version: 1.0.0-rc.1
 main: ym.dropzone.DropZonePlugin
 api-version: "1.16"
 folia-supported: true

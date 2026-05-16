@@ -36,17 +36,17 @@ class ProtocolLibEntityAdapter(
         sentLocations[entity.runtimeEntityId] = loc.clone()
         if (debugPackets()) {
             player.server.logger.info(
-                "[DropZone] ProtocolLib spawnArmorStandHead:\n" +
-                    "backend=PROTOCOLLIB,\n" +
-                    "player=${player.name},\n" +
-                    "entityId=${entity.runtimeEntityId},\n" +
-                    "spawnLocation=${formatLocation(entity.currentLocation)},\n" +
-                    "armorStandLocation=${formatLocation(loc)},\n" +
-                    "offset=${armorStandYOffset()},\n" +
-                    "small=${armorStandSmall()},\n" +
-                    "marker=${armorStandMarker()},\n" +
-                    "debugVisibleArmorStand=${debugVisibleArmorStand()},\n" +
-                    "item=${entity.itemStack.type}"
+                "[DropZone] ProtocolLib 生成盔甲架头颅:\n" +
+                    "后端=PROTOCOLLIB,\n" +
+                    "玩家=${player.name},\n" +
+                    "实体ID=${entity.runtimeEntityId},\n" +
+                    "奖励点位置=${formatLocation(entity.currentLocation)},\n" +
+                    "盔甲架位置=${formatLocation(loc)},\n" +
+                    "高度偏移=${armorStandYOffset()},\n" +
+                    "小型=${armorStandSmall()},\n" +
+                    "标记=${armorStandMarker()},\n" +
+                    "可见盔甲架调试=${debugVisibleArmorStand()},\n" +
+                    "物品=${entity.itemStack.type}"
             )
         }
 
@@ -243,15 +243,15 @@ class ProtocolLibEntityAdapter(
             ProtocolLibrary.getProtocolManager().sendServerPacket(player, packet, false)
             if (logSuccess && debugPackets()) {
                 plugin.logger.info(
-                    "[DropZone] ProtocolLib packet $action sent: player=${player.name}, packet=${packet.type}"
+                    "[DropZone] ProtocolLib 发包成功: 动作=$action, 玩家=${player.name}, 数据包=${packet.type}"
                 )
             }
         }.onFailure { error ->
             if (player.isOnline) {
                 plugin.logger.warning(
-                    "[DropZone] ProtocolLib send failed: player=${player.name}, " +
-                        "packet=${packet.type}, " +
-                        "error=${error.javaClass.simpleName}: ${error.message}"
+                    "[DropZone] ProtocolLib 发包失败: 玩家=${player.name}, " +
+                        "数据包=${packet.type}, " +
+                        "错误=${error.javaClass.simpleName}: ${error.message}"
                 )
             }
         }

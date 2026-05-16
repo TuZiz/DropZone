@@ -16,7 +16,7 @@ object SkullTextureUtil {
 
         val applied = applyTexture(meta, texture)
         if (!applied) {
-            Bukkit.getLogger().warning("[DropZone] Skull texture write failed; using plain PLAYER_HEAD fallback.")
+            Bukkit.getLogger().warning("[DropZone] 头颅材质写入失败，已回退为普通 PLAYER_HEAD。")
         }
 
         item.itemMeta = meta
@@ -27,14 +27,14 @@ object SkullTextureUtil {
         val skinUrl = resolveTextureUrl(texture) ?: return false
         return runCatching {
             val profile = createBukkitProfile()
-                ?: return@runCatching profileFailed("Bukkit.createPlayerProfile(UUID, String?) method not found")
+                ?: return@runCatching profileFailed("未找到 Bukkit.createPlayerProfile(UUID, String?) 方法")
             val textures = profile.javaClass.getMethod("getTextures").invoke(profile)
-                ?: return@runCatching profileFailed("PlayerProfile.getTextures returned null")
+                ?: return@runCatching profileFailed("PlayerProfile.getTextures 返回 null")
             val setSkin = textures.javaClass.methods.firstOrNull {
                 it.name == "setSkin" &&
                     it.parameterTypes.size == 1 &&
                     it.parameterTypes[0].isAssignableFrom(URL::class.java)
-            } ?: return@runCatching profileFailed("PlayerTextures.setSkin(URL) method not found")
+            } ?: return@runCatching profileFailed("未找到 PlayerTextures.setSkin(URL) 方法")
             setSkin.isAccessible = true
             setSkin.invoke(textures, skinUrl)
 
@@ -42,13 +42,13 @@ object SkullTextureUtil {
                 it.name == "setOwnerProfile" &&
                     it.parameterTypes.size == 1 &&
                     it.parameterTypes[0].isAssignableFrom(profile.javaClass)
-            } ?: return@runCatching profileFailed("SkullMeta.setOwnerProfile(PlayerProfile) method not found")
+            } ?: return@runCatching profileFailed("未找到 SkullMeta.setOwnerProfile(PlayerProfile) 方法")
             setter.isAccessible = true
             setter.invoke(meta, profile)
             true
         }.onFailure { error ->
             Bukkit.getLogger().warning(
-                "[DropZone] Bukkit profile skull texture write failed: ${error.javaClass.simpleName}: ${error.message}"
+                "[DropZone] Bukkit Profile 写入头颅材质失败: ${error.javaClass.simpleName}: ${error.message}"
             )
         }.getOrDefault(false)
     }
@@ -77,10 +77,10 @@ object SkullTextureUtil {
         val decoded = runCatching {
             String(Base64.getDecoder().decode(normalized), StandardCharsets.UTF_8)
         }.onFailure { error ->
-            Bukkit.getLogger().warning("[DropZone] Skull texture base64 decode failed: ${error.javaClass.simpleName}: ${error.message}")
+            Bukkit.getLogger().warning("[DropZone] 头颅材质 base64 解码失败: ${error.javaClass.simpleName}: ${error.message}")
         }.getOrNull() ?: return null
 
-        val decodedUrl = extractTextureUrl(decoded) ?: return textureUrlFailed("decoded texture url missing")
+        val decodedUrl = extractTextureUrl(decoded) ?: return textureUrlFailed("解码后未找到材质 URL")
         return runCatching { URL(toHttpsTextureUrl(decodedUrl)) }.getOrNull()
     }
 
@@ -95,12 +95,12 @@ object SkullTextureUtil {
     }
 
     private fun profileFailed(reason: String): Boolean {
-        Bukkit.getLogger().warning("[DropZone] Bukkit profile skull texture write failed: $reason")
+        Bukkit.getLogger().warning("[DropZone] Bukkit Profile 写入头颅材质失败: $reason")
         return false
     }
 
     private fun textureUrlFailed(reason: String): URL? {
-        Bukkit.getLogger().warning("[DropZone] Skull texture url resolve failed: $reason")
+        Bukkit.getLogger().warning("[DropZone] 头颅材质 URL 解析失败: $reason")
         return null
     }
 }

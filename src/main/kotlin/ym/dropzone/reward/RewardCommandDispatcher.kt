@@ -30,7 +30,7 @@ class RewardCommandDispatcher(
                 }.onFailure { error ->
                     success = false
                     plugin.logger.warning(
-                        "DropZone reward command failed: player=$playerName reward=$rewardId command=$resolved error=${error.message ?: error.javaClass.simpleName}"
+                        "[DropZone] 奖励命令执行失败: player=$playerName reward_id=$rewardId command=$resolved error=${error.message ?: error.javaClass.simpleName}"
                     )
                 }
             }

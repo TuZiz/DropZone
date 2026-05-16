@@ -12,6 +12,7 @@ import ym.dropzone.command.DropZoneTabCompleter
 import ym.dropzone.config.ConfigManager
 import ym.dropzone.config.LangKeys
 import ym.dropzone.entity.DropZoneEntityManager
+import ym.dropzone.diagnostic.StartupDiagnosticService
 import ym.dropzone.head.HeadFactory
 import ym.dropzone.head.HeadSelector
 import ym.dropzone.message.LangService
@@ -43,6 +44,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
     private lateinit var locationService: RandomLocationService
     private lateinit var langService: LangService
     private lateinit var placeholderService: PlaceholderService
+    private var startupDiagnosticService: StartupDiagnosticService? = null
     private var mysqlStorage: MysqlStorage? = null
     private var papiExpansion: Any? = null
     private val runningTasks = mutableListOf<ScheduledTaskHandle>()
@@ -59,7 +61,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
 
         configManager.loadMainConfigAsync().whenComplete { main, bootstrapError ->
             if (bootstrapError != null || main == null) {
-                failStartup("configuration bootstrap failed: ${bootstrapError?.message ?: "unknown"}")
+                failStartup("配置预加载失败: ${bootstrapError?.message ?: "未知错误"}")
                 return@whenComplete
             }
             if (main.stateStorage.mode == StorageMode.MYSQL) {
@@ -67,7 +69,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
                 mysqlStorage = storage
                 storage.initialize().whenComplete { _, storageError ->
                     if (storageError != null) {
-                        failStartup("MySQL initialization failed: ${storageError.message ?: storageError.javaClass.simpleName}")
+                        failStartup("MySQL 初始化失败: ${storageError.message ?: storageError.javaClass.simpleName}")
                         return@whenComplete
                     }
                     configManager.setActivityStateStore(storage)
@@ -111,20 +113,30 @@ class DropZonePlugin : JavaPlugin(), Listener {
                 return@whenComplete
             }
             snapshot.warnings.forEach { logger.warning(it) }
+            if (!isProtocolLibReady()) {
+                logger.warning("[DropZone] 启动警告: ProtocolLib 未安装或未启用 (server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}, storage.mode=${snapshot.main.stateStorage.mode}, activity_id=${snapshot.activity.id})")
+                failStartup("ProtocolLib 是必需依赖，但当前未安装或未启用。")
+                return@whenComplete
+            }
             logger.info(
-                "DropZone loaded: activity=${snapshot.activity.id}, spawn=${snapshot.main.spawn.enabled}, " +
-                    "maxActive=${snapshot.main.spawn.maxActive}, rewardCommand=${snapshot.main.rewardCommandExecutorMode}, " +
-                    "storage=${snapshot.main.stateStorage.mode}, server=${snapshot.main.server.id}, group=${snapshot.main.server.group}"
+                "[DropZone] 加载完成: 版本=${description.version}, 当前活动=${snapshot.activity.id}, 生成开关=${snapshot.main.spawn.enabled}, " +
+                    "最大活跃奖励点=${snapshot.main.spawn.maxActive}, 发奖命令调度=${snapshot.main.rewardCommandExecutorMode}, " +
+                    "存储模式=${snapshot.main.stateStorage.mode}, server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}"
             )
             if (SchedulerProvider.isFolia()) {
-                logger.warning("DropZone Folia mode: third-party reward commands may require GLOBAL_SAFE-compatible command handlers.")
+                logger.warning("[DropZone] Folia 模式: 第三方奖励命令可能需要兼容 GLOBAL_SAFE 的命令处理器。")
             }
+            startupDiagnosticService = StartupDiagnosticService(this, entityManager, mysqlStorage).also { it.emit(snapshot) }
             scheduler.runGlobal { startRuntimeTasks() }
         }
     }
 
+    private fun isProtocolLibReady(): Boolean {
+        return server.pluginManager.getPlugin("ProtocolLib")?.isEnabled == true
+    }
+
     private fun failStartup(message: String) {
-        logger.severe("DropZone startup failed: $message")
+        logger.severe("[DropZone] 启动失败: $message")
         runCatching {
             if (::scheduler.isInitialized) {
                 scheduler.runGlobal { server.pluginManager.disablePlugin(this) }
