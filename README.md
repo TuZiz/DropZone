@@ -24,9 +24,12 @@ DropZone 是一个 Minecraft 奖励点插件。它会在配置区域内随机生
 
 1. 将 `DropZone-1.0.0.jar` 放入服务器 `plugins/` 目录。
 2. 将 PacketEvents 插件也放入服务器 `plugins/` 目录。
-3. 启动服务器生成默认配置。
-4. 修改 `config.yml` 和 `action/default/` 下的活动文件。
-5. 执行 `/dz reload` 重载配置。
+3. 如果需要 PlaceholderAPI 变量，将 PlaceholderAPI 插件放入服务器 `plugins/` 目录。
+4. 启动服务器生成默认配置。
+5. 修改 `config.yml` 和 `action/default/` 下的活动文件。
+6. 执行 `/dz reload` 重载配置。
+
+DropZone jar 已内置 Kotlin、Adventure、MySQL、SQLite、PostgreSQL 驱动；PacketEvents 仍需作为独立插件安装。
 
 ## 构建
 
@@ -39,6 +42,8 @@ mvn clean package
 ```text
 target/DropZone-1.0.0.jar
 ```
+
+该 jar 会包含 Kotlin、Adventure 和常用数据库驱动，不包含 PacketEvents、PlaceholderAPI 或服务端 API。
 
 ## 配置文件
 

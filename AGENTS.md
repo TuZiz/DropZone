@@ -1,11 +1,11 @@
 # DropZone 项目读取规范
 
-本项目是 Kotlin + Maven 的 Bukkit/PacketEvents 插件，目标运行环境为 Minecraft 1.16+，Java 17 字节码，薄包构建。
+本项目是 Kotlin + Maven 的 Bukkit/PacketEvents 插件，目标运行环境为 Minecraft 1.16+，Java 17 字节码。构建产物内置 Kotlin、Adventure 和常用数据库驱动，PacketEvents 与 PlaceholderAPI 仍作为服务器外置插件依赖。
 
 ## 读取顺序
 
 1. 先读 `README.md`，确认安装方式、运行依赖和兼容边界。
-2. 再读 `pom.xml` 与 `src/main/resources/plugin.yml`，确认 Java/Kotlin 版本、薄包策略、PacketEvents 依赖和 Bukkit `libraries`。
+2. 再读 `pom.xml` 与 `src/main/resources/plugin.yml`，确认 Java/Kotlin 版本、shade 策略、PacketEvents 外置依赖和 PlaceholderAPI 软依赖。
 3. 配置行为从 `src/main/resources/config.yml`、`action/<活动名>/config.yml`、`heads.yml`、`rewards.yml`、`lang/zh_cn.yml` 开始读。
 4. 生命周期入口读 `src/main/kotlin/ym/dropzone/DropZonePlugin.kt`。
 5. 配置快照与 YAML 解析读 `config/ConfigManager.kt` 和 `config/ConfigModels.kt`。
@@ -17,7 +17,7 @@
 ## 修改规则
 
 - 所有文件使用 UTF-8。
-- 不要引入胖包或 shade；运行依赖通过服务器插件和 `plugin.yml libraries` 解决。
+- 构建包需要内置 Kotlin、Adventure、MySQL、SQLite、PostgreSQL 驱动；不要把 Spigot/Paper API、PacketEvents 或 PlaceholderAPI 打进 jar。
 - 不要新增 ProtocolLib、NMS、真实掉落物、ArmorStand 或 Display Entity 主实现。
 - 不要在主线程或 region thread 做 YAML 文件 IO。
 - 不要在领取奖励、tick、视距更新中读取配置文件。
@@ -37,4 +37,4 @@
 mvn clean package
 ```
 
-构建产物应为薄包 `target/DropZone-1.0.0.jar`，jar 内不应包含 `kotlin/`、`net/kyori/`、`com/github/retrooper/packetevents/` 依赖包主体。
+构建产物为 `target/DropZone-1.0.0.jar`，jar 内应包含 `kotlin/`、`net/kyori/`、`com/mysql/`、`org/sqlite/`、`org/postgresql/`，但不应包含 `com/github/retrooper/packetevents/` 或 `me/clip/placeholderapi/` 依赖包主体。
