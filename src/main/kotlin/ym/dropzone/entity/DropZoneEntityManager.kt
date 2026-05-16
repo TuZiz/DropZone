@@ -48,6 +48,21 @@ class DropZoneEntityManager(
         }
     }
 
+    fun revealToNearbyPlayersLive(entity: DropZoneEntity, snapshot: RuntimeConfigSnapshot) {
+        val entityWorldUid = entity.worldUid ?: return
+        val entityLoc = entity.currentLocation.clone()
+        val viewDistanceSquared = snapshot.main.fakeEntity.viewDistance * snapshot.main.fakeEntity.viewDistance
+        playerSnapshots.trackedIds().forEach { playerId ->
+            scheduler.runForPlayer(playerId) { player ->
+                if (!player.isOnline) return@runForPlayer
+                if (player.world.uid != entityWorldUid) return@runForPlayer
+                if (player.location.distanceSquared(entityLoc) <= viewDistanceSquared) {
+                    revealTo(player.uniqueId, entity)
+                }
+            }
+        }
+    }
+
     fun playSpawnMarker(entity: DropZoneEntity, snapshot: RuntimeConfigSnapshot) {
         val particle = ParticleUtil.parse(snapshot.main.effects.idleParticle.name)
             ?: ParticleUtil.parse("VILLAGER_HAPPY")

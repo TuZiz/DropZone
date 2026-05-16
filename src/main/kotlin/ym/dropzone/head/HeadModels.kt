@@ -1,5 +1,6 @@
 package ym.dropzone.head
 
+import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
 import ym.dropzone.util.SkullTextureUtil
@@ -18,7 +19,9 @@ data class HeadDefinition(
 
 class HeadFactory {
     fun create(definition: HeadDefinition): ItemStack {
-        val item = SkullTextureUtil.createHead(definition.texture)
+        val item = SkullTextureUtil.createHead(definition.texture).takeIf {
+            it.type == Material.PLAYER_HEAD && it.amount > 0
+        } ?: ItemStack(Material.PLAYER_HEAD, 1)
         val meta = item.itemMeta ?: return item
         applyDisplay(meta, definition)
         item.itemMeta = meta

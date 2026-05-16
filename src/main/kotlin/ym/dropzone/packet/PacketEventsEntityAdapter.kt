@@ -20,6 +20,15 @@ import java.util.Optional
 class PacketEventsEntityAdapter : PacketEntityAdapter {
     override fun spawnItemEntity(player: Player, entity: DropZoneEntity) {
         val loc = entity.currentLocation
+        val metadataIndex = runCatching { itemStackMetadataIndex(player) }.getOrDefault(-1)
+        player.server.logger.info(
+            "[DropZone] spawnItemEntity: player=${player.name}, " +
+                "entityId=${entity.runtimeEntityId}, " +
+                "item=${entity.itemStack.type}, " +
+                "amount=${entity.itemStack.amount}, " +
+                "index=$metadataIndex, " +
+                "loc=${loc.world?.name} ${loc.x},${loc.y},${loc.z}"
+        )
         // 只向指定玩家发送假物品实体，服务端不创建真实掉落物。
         val spawn = WrapperPlayServerSpawnEntity(
             entity.runtimeEntityId,
@@ -72,6 +81,14 @@ class PacketEventsEntityAdapter : PacketEntityAdapter {
     }
 
     private fun send(player: Player, packet: Any) {
-        PacketEvents.getAPI().playerManager.sendPacket(player, packet)
+        runCatching {
+            PacketEvents.getAPI().playerManager.sendPacket(player, packet)
+        }.onFailure { error ->
+            player.server.logger.warning(
+                "[DropZone] PacketEvents send failed: player=${player.name}, " +
+                    "packet=${packet.javaClass.simpleName}, " +
+                    "error=${error.javaClass.simpleName}: ${error.message}"
+            )
+        }
     }
 }

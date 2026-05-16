@@ -6,7 +6,7 @@ messages:
   claim-title: "<#FFD700>发现宝藏！"
   claim-subtitle: "<#AAAAAA>你获得了 <reward>"
   claim-actionbar: "<#FFFF55>+ <reward> <#AAAAAA>(<rarity><#AAAAAA>)"
-  navigation-actionbar: "<#FFD700>最近奖励点 <#FFFFFF>%distance%m <#AAAAAA>| <#55FFFF>%direction% <#AAAAAA>| <#FFFFFF>%world% %x%, %y%, %z% <#AAAAAA>| <reward>"
+  navigation-actionbar: "<#FFD700>最近奖励点 <#FFFFFF>%distance%m <#AAAAAA>| <#55FFFF>%direction% <#AAAAAA>| <#FFFFFF>%world% %x%, %y%, %z% <#AAAAAA>| <head>"
   navigation-actionbar-empty: "<#AAAAAA>等待奖励点生成中..."
   direction-front: "<#55FF55>前方"
   direction-front-left: "<#55FF55>左前"

@@ -56,7 +56,7 @@ class DropZoneCommand(
                     claimTracker.clearActivity(snapshot.activity.id)
                 }
                 restartTasks()
-                triggerSpawnCycle()
+                triggerSpawnCycle(snapshot)
                 val values = placeholderService.build(
                     snapshot.lang,
                     null,
@@ -128,9 +128,21 @@ class DropZoneCommand(
         }
     }
 
-    private fun triggerSpawnCycle() {
+    private fun triggerSpawnCycle(snapshot: RuntimeConfigSnapshot) {
+        if (!snapshot.main.spawn.enabled) return
+        val amount = if (snapshot.main.spawn.spawnOnStartup) {
+            snapshot.main.spawn.startupAmount
+        } else {
+            snapshot.main.spawn.attemptsPerCycle
+        }
         scheduler.runAsync {
-            SpawnCycleTask(configManager, scheduler, locationService, entityManager).run()
+            SpawnCycleTask(
+                configManager,
+                scheduler,
+                locationService,
+                entityManager,
+                amount.coerceAtLeast(1)
+            ).run()
         }
     }
 

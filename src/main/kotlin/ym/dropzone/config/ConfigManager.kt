@@ -450,7 +450,7 @@ class ConfigManager(
         private val FILE_NAME = Regex("[A-Za-z0-9_.-]+")
         private val RELATIVE_PATH = Regex("[A-Za-z0-9_./-]+")
         private val DEFAULT_LANG_MESSAGES = mapOf(
-            LangKeys.NAVIGATION_ACTIONBAR to "<#FFD700>最近奖励点 <#FFFFFF>%distance%m <#AAAAAA>| <#55FFFF>%direction% <#AAAAAA>| <#FFFFFF>%world% %x%, %y%, %z% <#AAAAAA>| <reward>",
+            LangKeys.NAVIGATION_ACTIONBAR to "<#FFD700>最近奖励点 <#FFFFFF>%distance%m <#AAAAAA>| <#55FFFF>%direction% <#AAAAAA>| <#FFFFFF>%world% %x%, %y%, %z% <#AAAAAA>| <head>",
             LangKeys.NAVIGATION_ACTIONBAR_EMPTY to "<#AAAAAA>等待奖励点生成中...",
             LangKeys.DIRECTION_FRONT to "<#55FF55>前方",
             LangKeys.DIRECTION_FRONT_LEFT to "<#55FF55>左前",

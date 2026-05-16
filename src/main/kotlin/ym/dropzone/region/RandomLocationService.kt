@@ -2,13 +2,14 @@ package ym.dropzone.region
 
 import org.bukkit.Bukkit
 import org.bukkit.Location
+import org.bukkit.World
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import ym.dropzone.config.LangKeys
 import ym.dropzone.config.RuntimeConfigSnapshot
 import ym.dropzone.scheduler.SchedulerAdapter
-import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ThreadLocalRandom
 
 class RandomLocationService(
     private val plugin: Plugin,
@@ -56,13 +57,13 @@ class RandomLocationService(
             future.complete(null)
             return
         }
-        val candidate = region.randomColumn(world)
+        val candidate = randomLoadedColumn(world, region) ?: region.randomColumn(world)
         scheduler.runAt(candidate) {
             val surface = if (isChunkLoaded(candidate)) findSurface(candidate, region) else null
             if (surface != null && validator.isValid(surface, snapshot.main.locationRules)) {
                 future.complete(surface)
             } else {
-                attempt(snapshot, region, index + 1, future)
+                scheduler.runGlobal { attempt(snapshot, region, index + 1, future) }
             }
         }
     }
@@ -106,6 +107,32 @@ class RandomLocationService(
     private fun isChunkLoaded(location: Location): Boolean {
         val world = location.world ?: return false
         return world.isChunkLoaded(location.blockX shr 4, location.blockZ shr 4)
+    }
+
+    private fun randomLoadedColumn(world: World, region: SpawnRegion): Location? {
+        val loadedChunks = world.loadedChunks.filter { chunk ->
+            val minX = chunk.x shl 4
+            val minZ = chunk.z shl 4
+            val maxX = minX + 15
+            val maxZ = minZ + 15
+
+            region.containsBlock(minX, minZ) ||
+                region.containsBlock(maxX, minZ) ||
+                region.containsBlock(minX, maxZ) ||
+                region.containsBlock(maxX, maxZ)
+        }
+        if (loadedChunks.isEmpty()) return null
+
+        val random = ThreadLocalRandom.current()
+        repeat(64) {
+            val chunk = loadedChunks[random.nextInt(loadedChunks.size)]
+            val x = (chunk.x shl 4) + random.nextInt(16)
+            val z = (chunk.z shl 4) + random.nextInt(16)
+            if (region.containsBlock(x, z)) {
+                return Location(world, x + 0.5, region.maxY().toDouble(), z + 0.5)
+            }
+        }
+        return null
     }
 
     private fun findSurface(column: Location, region: SpawnRegion): Location? {

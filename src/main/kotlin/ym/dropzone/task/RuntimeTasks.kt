@@ -37,12 +37,47 @@ class SpawnCycleTask(
         val snapshot = configManager.snapshot ?: return
         if (!snapshot.main.spawn.enabled) return
         val perCycle = requestedAmount ?: snapshot.main.spawn.attemptsPerCycle
-        val missing = (snapshot.main.spawn.maxActive - entityManager.activeCount()).coerceAtMost(perCycle)
+        val activeCount = entityManager.activeCount()
+        val missing = (snapshot.main.spawn.maxActive - activeCount).coerceAtMost(perCycle)
+        if (snapshot.main.debug) {
+            println(
+                "[DropZone] SpawnCycle start: activity=${snapshot.activity.id}, " +
+                    "requested=$requestedAmount, perCycle=$perCycle, missing=$missing, " +
+                    "active=$activeCount, maxActive=${snapshot.main.spawn.maxActive}"
+            )
+        }
         repeat(missing.coerceAtLeast(0)) {
             locationService.findLocation(snapshot).thenAccept { location ->
-                if (location != null) {
-                    scheduler.runAt(location) {
-                        entityManager.createAt(location, snapshot)
+                if (location == null) {
+                    if (snapshot.main.debug) {
+                        println(
+                            "[DropZone] SpawnCycle failed: no valid location, " +
+                                "world=${snapshot.activity.spawnRegion.world}, " +
+                                "attempts=${snapshot.main.locationRules.maxLocationAttempts}"
+                        )
+                    }
+                    return@thenAccept
+                }
+                scheduler.runAt(location) {
+                    val entity = entityManager.createAt(location, snapshot)
+                    if (entity == null) {
+                        if (snapshot.main.debug) {
+                            println(
+                                "[DropZone] SpawnCycle failed: createAt returned null at " +
+                                    "${location.world?.name} ${location.blockX},${location.blockY},${location.blockZ}, " +
+                                    "active=${entityManager.activeCount()}"
+                            )
+                        }
+                        return@runAt
+                    }
+                    entityManager.revealToNearbyPlayersLive(entity, snapshot)
+                    entityManager.playSpawnMarker(entity, snapshot)
+                    if (snapshot.main.debug) {
+                        println(
+                            "[DropZone] SpawnCycle success: " +
+                                "${location.world?.name} ${location.blockX},${location.blockY},${location.blockZ}, " +
+                                "entity=${entity.runtimeEntityId}, reward=${entity.roll.reward.id}, rarity=${entity.roll.rarity.id}"
+                        )
                     }
                 }
             }
