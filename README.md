@@ -1,28 +1,23 @@
 # DropZone
 
-DropZone 是一个 Bukkit/Paper/Purpur/Folia 插件，会在配置区域内随机生成客户端可见的假头颅奖励点。玩家靠近后奖励点会飞向玩家，领取成功后通过控制台命令发奖。
+DropZone 是一个 Bukkit / Paper / Purpur / Folia 插件，用于在配置区域内随机生成客户端可见的假头颅奖励点。玩家靠近奖励点后，头颅会吸附飞向玩家；领取成功后，插件通过可恢复的发奖队列执行控制台奖励命令。
 
 当前版本：`1.0.0-rc.1`
 
-假实体后端只使用 ProtocolLib 发送客户端假 ArmorStand 头颅包，不创建服务端真实实体、真实掉落物或 NMS 主实现。
+## 版本文档
 
-## 胖包说明
+- [CHANGELOG.md](CHANGELOG.md)：按版本记录改动。
+- [RELEASE_NOTES.md](RELEASE_NOTES.md)：`v1.0.0-rc.1` 测试服发布说明。
 
-本项目使用 Maven 构建胖包：
+## 核心特性
 
-```bash
-mvn clean package
-```
-
-正式产物：
-
-```text
-target/DropZone-1.0.0-rc.1-all.jar
-```
-
-插件不使用 `plugin.yml libraries`。Kotlin、Adventure/MiniMessage、HikariCP、MySQL JDBC、Gson 会被 shade 并 relocate 到 `ym.dropzone.libs.*`。
-
-ProtocolLib、PlaceholderAPI 由服务器插件环境提供，不会被打进 DropZone jar。
+- ProtocolLib 假 ArmorStand 头颅显示，不创建服务端真实实体、真实掉落物或 NMS 主实现。
+- 支持 `LOCAL_JSON` 单服测试模式。
+- 支持 `MYSQL` 正式服和多服跨服模式。
+- MySQL 是跨服权威数据源，本地内存只做本服在线玩家可见缓存。
+- 领取奖励走 `dropzone_reward_outbox` 队列，避免把 `Bukkit.dispatchCommand` 当作最终持久化成功。
+- 支持 Bukkit / Paper / Purpur / Folia 调度边界。
+- 启动时自动输出一次中文诊断日志，便于测试服上线前检查。
 
 ## 运行依赖
 
@@ -35,14 +30,39 @@ ProtocolLib、PlaceholderAPI 由服务器插件环境提供，不会被打进 Dr
 
 PacketEvents 已不再需要。旧配置如果还有 `packet-backend: packetevents`，请改成 `protocolib`。
 
+## 构建
+
+```bash
+mvn clean package
+```
+
+正式产物：
+
+```text
+target/DropZone-1.0.0-rc.1-all.jar
+```
+
+插件不使用 `plugin.yml libraries`。Kotlin、Adventure / MiniMessage、HikariCP、MySQL JDBC、Gson 会被 shade 并 relocate 到 `ym.dropzone.libs.*`。
+
+ProtocolLib 和 PlaceholderAPI 由服务器插件环境提供，不会被打进 DropZone jar。
+
+## 安装
+
+1. 确认服务器使用 Java 17。
+2. 将 ProtocolLib 放入服务器 `plugins/` 目录。
+3. 将 `target/DropZone-1.0.0-rc.1-all.jar` 放入服务器 `plugins/` 目录。
+4. 首次启动服务器，让插件生成默认配置。
+5. 停服后编辑 `plugins/DropZone/config.yml`、`fake-entity.yml`、`reward-outbox.yml` 和 `action/default/` 下的活动资源配置。
+6. 再次启动服务器，查看控制台启动诊断。
+
 ## 存储模式
 
 默认配置使用 `LOCAL_JSON`，仅适合单服测试。
 
-- `LOCAL_JSON`：单服测试。
+- `LOCAL_JSON`：单服本地测试。
 - `MYSQL`：正式服和多服跨服模式。
 
-`cross-server.enabled=true` 时必须使用 `MYSQL`，并把 `spawn.cross-server-mode` 改为 `DATABASE_LOCK`，否则插件会拒绝启动。
+`cross-server.enabled=true` 时必须使用 `MYSQL`，并且 `spawn.cross-server-mode` 必须为 `DATABASE_LOCK`，否则插件会拒绝启动。
 
 ## MySQL 配置
 
@@ -110,11 +130,27 @@ fake-entity:
   packet-backend: protocolib
 ```
 
-每台子服 `server.id` 必须唯一。同一组玩法服务器使用相同 `server.group`。lobby 不建议和 survival 共用 group。ProtocolLib 必须安装。
+每台子服的 `server.id` 必须唯一。同一组玩法服务器使用相同 `server.group`。lobby 不建议和 survival 共用 group。
+
+## 活动资源配置
+
+活动内容位于：
+
+```text
+plugins/DropZone/action/<活动名>/
+```
+
+每个活动目录应包含：
+
+- `config.yml`：活动开关、显示名、领取规则、生成区域。
+- `heads.yml`：奖励点头颅材质和稀有度。
+- `rewards.yml`：稀有度、权重和发奖命令。
+
+不要在资源根目录新增 `heads.yml` 或 `rewards.yml`。活动资源应放入对应的 `action/<活动名>/` 目录。
 
 ## 发奖队列
 
-领取成功后不会直接把 `Bukkit.dispatchCommand` 当作最终持久化成功。插件先写入 `dropzone_reward_outbox`，再由 `RewardOutboxWorker` 扫描 PENDING 任务，通过安全调度器执行命令。
+领取成功后，插件先写入 `dropzone_reward_outbox`，再由 `RewardOutboxWorker` 扫描 PENDING 任务并执行奖励命令。这样即使服务器崩溃或重启，也能恢复未完成的发奖任务。
 
 ```yaml
 reward-outbox:
@@ -123,7 +159,7 @@ reward-outbox:
   max-attempts: 5
   claim-batch-size: 20
   processing-timeout-seconds: 60
-  consume-mode: "CURRENT_SERVER"
+  consume-mode: CURRENT_SERVER
 ```
 
 `consume-mode` 支持：
@@ -197,7 +233,7 @@ fake-entity:
 /dz outbox failed
 ```
 
-本版本没有 `/dz doctor`，也没有 `dropzone.doctor` 权限。
+本版本没有 `/dz doctor`，也没有 `dropzone.doctor` 权限。启动诊断只在插件启动时自动输出。
 
 ## 从旧版本升级
 
@@ -215,6 +251,7 @@ fake-entity:
 ## 正式服上线检查清单
 
 - [ ] `mvn clean package` 成功
+- [ ] 使用 `target/DropZone-1.0.0-rc.1-all.jar`
 - [ ] ProtocolLib 已安装
 - [ ] `config.yml` 中 `packet-backend=protocolib`
 - [ ] `debug-packets=false`
@@ -229,7 +266,7 @@ fake-entity:
 - [ ] 奖励命令能正常发放
 - [ ] 发奖队列没有异常 FAILED
 - [ ] 多服 `server.id` 不重复
-- [ ] 多服 `group` 配置正确
+- [ ] 多服 `server.group` 配置正确
 - [ ] 测试服运行至少 24 小时
 - [ ] 正式服上线前备份数据库和配置
 
