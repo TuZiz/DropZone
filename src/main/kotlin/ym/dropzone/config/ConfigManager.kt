@@ -287,7 +287,7 @@ class ConfigManager(
                 "server.group=${yaml.getString("server.group", "main")}, " +
                 "storage.mode=${yaml.getString("storage.mode", yaml.getString("state-storage.mode", "LOCAL_JSON"))}, " +
                 "activity_id=${yaml.getString("action.default-activity", "default")}"
-            plugin.logger.warning("[DropZone] PacketEvents 后端已移除，当前已回退到 ProtocolLib。请把 fake-entity.packet-backend 改为 \"protocolib\"。($context)")
+            plugin.logger.warning("PacketEvents 后端已移除，当前已回退到 ProtocolLib。请把 fake-entity.packet-backend 改为 \"protocolib\"。($context)")
         }
         val rawServerId = yaml.getString("server.id", "server-1") ?: "server-1"
         val rawServerGroup = yaml.getString("server.group", "main") ?: "main"

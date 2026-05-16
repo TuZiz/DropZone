@@ -58,26 +58,26 @@ class StartupDiagnosticService(
             false -> "连接失败"
             null -> "LOCAL_JSON 模式未启用"
         }
-        plugin.logger.info("[DropZone] ===== 启动诊断 =====")
-        plugin.logger.info("[DropZone] 插件版本: ${plugin.description.version}")
-        plugin.logger.info("[DropZone] 当前启用活动: ${snapshot.activity.id}")
-        plugin.logger.info("[DropZone] 存储模式: ${main.stateStorage.mode}")
-        plugin.logger.info("[DropZone] 服务器: ${main.server.id} / 分组 ${main.server.group}")
-        plugin.logger.info("[DropZone] 跨服同步: ${onOff(main.crossServer.enabled)}")
-        plugin.logger.info("[DropZone] 生成模式: ${main.spawn.crossServerMode}")
-        plugin.logger.info("[DropZone] MySQL: $mysqlStatus")
-        plugin.logger.info("[DropZone] 本服活跃奖励点: ${entityManager.activeCount()}")
-        plugin.logger.info("[DropZone] 发奖队列: 待处理=${data.outbox.pending} 处理中=${data.outbox.processing} 已完成=${data.outbox.done} 失败=${data.outbox.failed}")
-        plugin.logger.info("[DropZone] ProtocolLib: ${if (data.protocolLibDetected) "已检测" else "未检测到"}")
+        plugin.logger.info("===== 启动诊断 =====")
+        plugin.logger.info("插件版本: ${plugin.description.version}")
+        plugin.logger.info("当前启用活动: ${snapshot.activity.id}")
+        plugin.logger.info("存储模式: ${main.stateStorage.mode}")
+        plugin.logger.info("服务器: ${main.server.id} / 分组 ${main.server.group}")
+        plugin.logger.info("跨服同步: ${onOff(main.crossServer.enabled)}")
+        plugin.logger.info("生成模式: ${main.spawn.crossServerMode}")
+        plugin.logger.info("MySQL: $mysqlStatus")
+        plugin.logger.info("本服活跃奖励点: ${entityManager.activeCount()}")
+        plugin.logger.info("发奖队列: 待处理=${data.outbox.pending} 处理中=${data.outbox.processing} 已完成=${data.outbox.done} 失败=${data.outbox.failed}")
+        plugin.logger.info("ProtocolLib: ${if (data.protocolLibDetected) "已检测" else "未检测到"}")
         plugin.logger.info(
-            "[DropZone] 盔甲架参数: 高度偏移=${main.fakeEntity.armorStandYOffset} " +
+            "盔甲架参数: 高度偏移=${main.fakeEntity.armorStandYOffset} " +
                 "小型=${main.fakeEntity.armorStandSmall} 标记=${main.fakeEntity.armorStandMarker}"
         )
-        plugin.logger.info("[DropZone] 发奖队列配置: 启用=${main.rewardOutbox.enabled} 消费模式=${main.rewardOutbox.consumeMode}")
-        plugin.logger.info("[DropZone] 调试开关: 发包=${main.fakeEntity.debugPackets} 可见盔甲架=${main.fakeEntity.debugVisibleArmorStand}")
-        plugin.logger.info("[DropZone] PlaceholderAPI: ${if (plugin.server.pluginManager.getPlugin("PlaceholderAPI")?.isEnabled == true) "已检测" else "未检测到"}")
-        plugin.logger.info("[DropZone] Folia: ${yesNo(SchedulerProvider.isFolia())}")
-        plugin.logger.info("[DropZone] ==============================")
+        plugin.logger.info("发奖队列配置: 启用=${main.rewardOutbox.enabled} 消费模式=${main.rewardOutbox.consumeMode}")
+        plugin.logger.info("调试开关: 发包=${main.fakeEntity.debugPackets} 可见盔甲架=${main.fakeEntity.debugVisibleArmorStand}")
+        plugin.logger.info("PlaceholderAPI: ${if (plugin.server.pluginManager.getPlugin("PlaceholderAPI")?.isEnabled == true) "已检测" else "未检测到"}")
+        plugin.logger.info("Folia: ${yesNo(SchedulerProvider.isFolia())}")
+        plugin.logger.info("==============================")
     }
 
     private fun warnDangerousConfig(snapshot: RuntimeConfigSnapshot, protocolLibDetected: Boolean) {
@@ -99,12 +99,12 @@ class StartupDiagnosticService(
     }
 
     private fun warn(snapshot: RuntimeConfigSnapshot, message: String) {
-        plugin.logger.warning("[DropZone] 启动警告: $message (${context(snapshot)})")
+        plugin.logger.warning("启动警告: $message (${context(snapshot)})")
     }
 
     private fun warnDiagnosticFailure(snapshot: RuntimeConfigSnapshot, phase: String, error: Throwable) {
         plugin.logger.warning(
-            "[DropZone] 启动警告: $phase 失败: ${error.javaClass.simpleName}: ${error.message} " +
+            "启动警告: $phase 失败: ${error.javaClass.simpleName}: ${error.message} " +
                 "(${context(snapshot)}, outbox_id=n/a, spawn_id=n/a, player_uuid=n/a, reward_id=n/a)"
         )
     }

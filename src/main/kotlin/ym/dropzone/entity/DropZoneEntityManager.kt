@@ -191,7 +191,7 @@ class DropZoneEntityManager(
             if (now >= entity.expiresAtMillis && entity.state.compareAndSet(DropZoneEntityState.WAITING, DropZoneEntityState.EXPIRED)) {
                 mysqlStorage?.markExpired(entity.id)?.whenComplete { _, error ->
                     if (error != null) {
-                        plugin.logger.warning("[DropZone] MySQL 标记奖励点过期失败: server.id=${configManager.snapshot?.main?.server?.id}, activity_id=${snapshot.activity.id}, spawn_id=${entity.id}, reward_id=${entity.roll.reward.id}, error=${error.message ?: error.javaClass.simpleName}")
+                        plugin.logger.warning("MySQL 标记奖励点过期失败: server.id=${configManager.snapshot?.main?.server?.id}, activity_id=${snapshot.activity.id}, spawn_id=${entity.id}, reward_id=${entity.roll.reward.id}, error=${error.message ?: error.javaClass.simpleName}")
                     }
                 }
                 scheduler.runAt(entity.currentLocation) { remove(entity, destroy = true) }
@@ -482,7 +482,7 @@ class DropZoneEntityManager(
         if (!entity.visibleTo.remove(player.uniqueId)) return
         if (snapshot.main.fakeEntity.debugPackets || snapshot.main.debug) {
             plugin.logger.info(
-                "[DropZone] 隐藏假实体: 玩家=${player.name}, 实体ID=${entity.runtimeEntityId}, 原因=$reason"
+                "隐藏假实体: 玩家=${player.name}, 实体ID=${entity.runtimeEntityId}, 原因=$reason"
             )
         }
         packetAdapter.destroyEntity(player, entity.runtimeEntityId)

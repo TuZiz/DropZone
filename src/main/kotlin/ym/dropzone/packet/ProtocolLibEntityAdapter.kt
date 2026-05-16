@@ -36,7 +36,7 @@ class ProtocolLibEntityAdapter(
         sentLocations[entity.runtimeEntityId] = loc.clone()
         if (debugPackets()) {
             player.server.logger.info(
-                "[DropZone] ProtocolLib 生成盔甲架头颅:\n" +
+                "ProtocolLib 生成盔甲架头颅:\n" +
                     "后端=PROTOCOLLIB,\n" +
                     "玩家=${player.name},\n" +
                     "实体ID=${entity.runtimeEntityId},\n" +
@@ -243,13 +243,13 @@ class ProtocolLibEntityAdapter(
             ProtocolLibrary.getProtocolManager().sendServerPacket(player, packet, false)
             if (logSuccess && debugPackets()) {
                 plugin.logger.info(
-                    "[DropZone] ProtocolLib 发包成功: 动作=$action, 玩家=${player.name}, 数据包=${packet.type}"
+                    "ProtocolLib 发包成功: 动作=$action, 玩家=${player.name}, 数据包=${packet.type}"
                 )
             }
         }.onFailure { error ->
             if (player.isOnline) {
                 plugin.logger.warning(
-                    "[DropZone] ProtocolLib 发包失败: 玩家=${player.name}, " +
+                    "ProtocolLib 发包失败: 玩家=${player.name}, " +
                         "数据包=${packet.type}, " +
                         "错误=${error.javaClass.simpleName}: ${error.message}"
                 )

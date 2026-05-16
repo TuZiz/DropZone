@@ -68,7 +68,7 @@ class LangService(private val plugin: Plugin, private val placeholders: Placehol
         val next = nextActionBarWarningAt.get()
         if (now < next || !nextActionBarWarningAt.compareAndSet(next, now + ACTION_BAR_WARNING_INTERVAL_MILLIS)) return
         plugin.logger.warning(
-            "[DropZone] ActionBar 发送失败: key=$key, 错误=${error.message ?: error.javaClass.simpleName}"
+            "ActionBar 发送失败: key=$key, 错误=${error.message ?: error.javaClass.simpleName}"
         )
     }
 

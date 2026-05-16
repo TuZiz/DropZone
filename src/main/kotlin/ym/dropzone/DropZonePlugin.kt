@@ -114,17 +114,12 @@ class DropZonePlugin : JavaPlugin(), Listener {
             }
             snapshot.warnings.forEach { logger.warning(it) }
             if (!isProtocolLibReady()) {
-                logger.warning("[DropZone] 启动警告: ProtocolLib 未安装或未启用 (server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}, storage.mode=${snapshot.main.stateStorage.mode}, activity_id=${snapshot.activity.id})")
+                logger.warning("启动警告: ProtocolLib 未安装或未启用 (server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}, storage.mode=${snapshot.main.stateStorage.mode}, activity_id=${snapshot.activity.id})")
                 failStartup("ProtocolLib 是必需依赖，但当前未安装或未启用。")
                 return@whenComplete
             }
-            logger.info(
-                "[DropZone] 加载完成: 版本=${description.version}, 当前活动=${snapshot.activity.id}, 生成开关=${snapshot.main.spawn.enabled}, " +
-                    "最大活跃奖励点=${snapshot.main.spawn.maxActive}, 发奖命令调度=${snapshot.main.rewardCommandExecutorMode}, " +
-                    "存储模式=${snapshot.main.stateStorage.mode}, server.id=${snapshot.main.server.id}, server.group=${snapshot.main.server.group}"
-            )
             if (SchedulerProvider.isFolia()) {
-                logger.warning("[DropZone] Folia 模式: 第三方奖励命令可能需要兼容 GLOBAL_SAFE 的命令处理器。")
+                logger.warning("Folia 模式: 第三方奖励命令可能需要兼容 GLOBAL_SAFE 的命令处理器。")
             }
             startupDiagnosticService = StartupDiagnosticService(this, entityManager, mysqlStorage).also { it.emit(snapshot) }
             scheduler.runGlobal { startRuntimeTasks() }
@@ -136,7 +131,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
     }
 
     private fun failStartup(message: String) {
-        logger.severe("[DropZone] 启动失败: $message")
+        logger.severe("启动失败: $message")
         runCatching {
             if (::scheduler.isInitialized) {
                 scheduler.runGlobal { server.pluginManager.disablePlugin(this) }
