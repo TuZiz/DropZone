@@ -200,6 +200,8 @@ class ConfigManager(
         if (manualMode == null) {
             errors += issue(lang, LangKeys.CONFIG_ERROR_MANUAL_SPAWN_MODE, "path" to "config.spawn.manual.mode", "value" to manualModeText.orEmpty())
         }
+        val packetBackendText = yaml.getString("fake-entity.packet-backend", "PROTOCOLLIB")
+        val packetBackend = SafeEnumParser.parse<PacketBackend>(packetBackendText) ?: PacketBackend.PROTOCOLLIB
         return MainConfig(
             debug = yaml.getBoolean("settings.debug", false),
             language = yaml.getString("settings.language", "zh_CN") ?: "zh_CN",
@@ -238,6 +240,8 @@ class ConfigManager(
                 )
             ),
             fakeEntity = FakeEntityConfig(
+                packetBackend = packetBackend,
+                debugPackets = yaml.getBoolean("fake-entity.debug-packets", true),
                 viewDistance = yaml.getDouble("fake-entity.view-distance", 48.0),
                 attractDistance = yaml.getDouble("fake-entity.attract-distance", 6.0),
                 pickupDistance = yaml.getDouble("fake-entity.pickup-distance", 1.2),

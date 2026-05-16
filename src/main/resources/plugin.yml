@@ -3,9 +3,9 @@ version: ${project.version}
 main: ym.dropzone.DropZonePlugin
 api-version: "1.16"
 folia-supported: true
-depend:
-  - packetevents
 softdepend:
+  - packetevents
+  - ProtocolLib
   - PlaceholderAPI
 commands:
   dropzone:

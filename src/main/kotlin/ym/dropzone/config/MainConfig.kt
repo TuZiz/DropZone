@@ -49,6 +49,11 @@ enum class ManualSpawnMode {
     REGION_RANDOM
 }
 
+enum class PacketBackend {
+    PROTOCOLLIB,
+    PACKETEVENTS
+}
+
 data class SpawnRegionConfig(
     val world: String,
     val mode: SpawnRegionMode,
@@ -100,6 +105,8 @@ data class ManualSpawnConfig(
 )
 
 data class FakeEntityConfig(
+    val packetBackend: PacketBackend,
+    val debugPackets: Boolean,
     val viewDistance: Double,
     val attractDistance: Double,
     val pickupDistance: Double,

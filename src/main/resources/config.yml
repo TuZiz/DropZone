@@ -88,6 +88,9 @@ spawn:
     respect-region: false
 
 fake-entity:
+  # 发包后端二选一：protocollib / packetevents
+  packet-backend: "protocollib"
+  debug-packets: true
   # 玩家进入该距离后才会收到假实体数据包。
   view-distance: 48.0
   # 玩家进入该距离后头颅开始吸附。

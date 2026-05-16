@@ -43,6 +43,10 @@
             <id>codemc-public</id>
             <url>https://repo.codemc.io/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>protocollib</id>
+            <url>https://repo.dmulloy2.net/repository/public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -56,6 +60,12 @@
             <groupId>com.github.retrooper</groupId>
             <artifactId>packetevents-spigot</artifactId>
             <version>2.12.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.comphenix.protocol</groupId>
+            <artifactId>ProtocolLib</artifactId>
+            <version>5.3.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -171,6 +181,7 @@
                                 <excludes>
                                     <exclude>org.spigotmc:spigot-api</exclude>
                                     <exclude>com.github.retrooper:packetevents-spigot</exclude>
+                                    <exclude>com.comphenix.protocol:ProtocolLib</exclude>
                                     <exclude>me.clip:placeholderapi</exclude>
                                 </excludes>
                             </artifactSet>

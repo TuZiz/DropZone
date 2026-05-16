@@ -16,7 +16,7 @@ import ym.dropzone.head.HeadFactory
 import ym.dropzone.head.HeadSelector
 import ym.dropzone.message.LangService
 import ym.dropzone.message.PlaceholderService
-import ym.dropzone.packet.PacketEventsEntityAdapter
+import ym.dropzone.packet.PacketAdapterFactory
 import ym.dropzone.player.PlayerSnapshotService
 import ym.dropzone.region.LocationValidator
 import ym.dropzone.region.RandomLocationService
@@ -59,7 +59,7 @@ class DropZonePlugin : JavaPlugin(), Listener {
             this,
             configManager,
             scheduler,
-            PacketEventsEntityAdapter(),
+            PacketAdapterFactory.create(this, configManager),
             playerSnapshots,
             claimTracker,
             langService,
