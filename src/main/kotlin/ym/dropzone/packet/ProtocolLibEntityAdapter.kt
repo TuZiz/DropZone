@@ -195,7 +195,7 @@ class ProtocolLibEntityAdapter(
     }
 
     private fun armorStandLocation(location: Location): Location {
-        return location.clone().add(0.0, -1.05, 0.0)
+        return location.clone().add(0.0, -0.85, 0.0)
     }
 
     private fun angle(value: Double): Byte {

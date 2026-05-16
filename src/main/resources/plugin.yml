@@ -4,7 +4,6 @@ main: ym.dropzone.DropZonePlugin
 api-version: "1.16"
 folia-supported: true
 softdepend:
-  - packetevents
   - ProtocolLib
   - PlaceholderAPI
 commands:

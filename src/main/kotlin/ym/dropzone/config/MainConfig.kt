@@ -92,8 +92,7 @@ enum class ManualSpawnMode {
 }
 
 enum class PacketBackend {
-    PROTOCOLLIB,
-    PACKETEVENTS
+    PROTOCOLLIB
 }
 
 data class SpawnRegionConfig(

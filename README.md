@@ -2,7 +2,7 @@
 
 DropZone 是一个 Bukkit/Paper/Purpur/Folia 插件，会在配置区域内随机生成客户端可见的假头颅奖励点。玩家靠近后奖励点会飞向玩家，领取成功后通过控制台命令发奖。
 
-假实体后端使用 PacketEvents 或 ProtocolLib 发送客户端假 ArmorStand 头颅包，不创建服务端真实实体。
+假实体后端使用 ProtocolLib 发送客户端假 ArmorStand 头颅包，不创建服务端真实实体。
 
 ## 胖包说明
 
@@ -20,14 +20,14 @@ target/DropZone-1.0.0-all.jar
 
 插件不使用 `plugin.yml libraries`。Kotlin、Adventure/MiniMessage、HikariCP、MySQL JDBC、Gson 会被 shade 并 relocate 到 `ym.dropzone.libs.*`。
 
-PacketEvents、ProtocolLib、PlaceholderAPI 仍由服务器插件环境提供，不会被打进 DropZone jar。
+ProtocolLib、PlaceholderAPI 仍由服务器插件环境提供，不会被打进 DropZone jar。
 
 ## 运行依赖
 
 - Java 17
 - Minecraft 1.16.5+
 - Spigot / Paper / Purpur / Folia
-- PacketEvents 或 ProtocolLib 至少安装一个
+- ProtocolLib
 - PlaceholderAPI 可选
 - MySQL 8.x 或兼容 MySQL 协议的数据库
 
@@ -162,8 +162,8 @@ dropzone.outbox
 **是否需要 plugin.yml libraries？**  
 不需要。本插件是胖包。
 
-**PacketEvents 和 ProtocolLib 是否会被打进 jar？**  
-不会。二者仍需单独安装到服务器 `plugins/` 目录。
+**ProtocolLib 是否会被打进 jar？**  
+不会。ProtocolLib 仍需单独安装到服务器 `plugins/` 目录。
 
 **LOCAL_JSON 能用于多服吗？**  
 不能。LOCAL_JSON 只适合单服测试。

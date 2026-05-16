@@ -93,7 +93,7 @@ spawn:
     respect-region: false
 
 fake-entity:
-  packet-backend: "packetevents"
+  packet-backend: "protocolib"
   debug-packets: false
   debug-visible-armorstand: false
   view-distance: 48.0

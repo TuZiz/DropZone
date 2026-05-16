@@ -17,7 +17,6 @@ private class SwitchingPacketEntityAdapter(
     private val configManager: ConfigManager
 ) : PacketEntityAdapter {
     private var protocolLibAdapter: PacketEntityAdapter? = null
-    private var packetEventsAdapter: PacketEntityAdapter? = null
     private val warned = mutableSetOf<String>()
 
     override fun spawnItemEntity(player: Player, entity: DropZoneEntity) {
@@ -39,26 +38,10 @@ private class SwitchingPacketEntityAdapter(
     private fun delegate(): PacketEntityAdapter? {
         val desired = configManager.snapshot?.main?.fakeEntity?.packetBackend ?: PacketBackend.PROTOCOLLIB
         val hasProtocolLib = plugin.server.pluginManager.getPlugin("ProtocolLib")?.isEnabled == true
-        val hasPacketEvents = plugin.server.pluginManager.getPlugin("packetevents")?.isEnabled == true ||
-            plugin.server.pluginManager.getPlugin("PacketEvents")?.isEnabled == true
 
         return when (desired) {
             PacketBackend.PROTOCOLLIB -> {
                 if (hasProtocolLib) {
-                    protocolLib()
-                } else if (hasPacketEvents) {
-                    warnOnce("missing-protocollib", "[DropZone] ProtocolLib is not installed; falling back to PacketEvents fake entity backend.")
-                    packetEvents()
-                } else {
-                    severeOnce()
-                    null
-                }
-            }
-            PacketBackend.PACKETEVENTS -> {
-                if (hasPacketEvents) {
-                    packetEvents()
-                } else if (hasProtocolLib) {
-                    warnOnce("missing-packetevents", "[DropZone] PacketEvents is not installed; falling back to ProtocolLib fake entity backend.")
                     protocolLib()
                 } else {
                     severeOnce()
@@ -81,22 +64,13 @@ private class SwitchingPacketEntityAdapter(
         }
     }
 
-    private fun packetEvents(): PacketEntityAdapter {
-        val existing = packetEventsAdapter
-        if (existing != null) return existing
-        return PacketEventsEntityAdapter { configManager.snapshot?.main?.fakeEntity?.debugPackets ?: false }.also {
-            packetEventsAdapter = it
-            plugin.logger.info("[DropZone] Fake entity packet backend initialized: PACKETEVENTS")
-        }
-    }
-
     private fun warnOnce(key: String, message: String) {
         if (warned.add(key)) plugin.logger.warning(message)
     }
 
     private fun severeOnce() {
-        if (warned.add("missing-all-packet-backends")) {
-            plugin.logger.severe("[DropZone] Neither ProtocolLib nor PacketEvents is installed; fake entity packets are disabled.")
+        if (warned.add("missing-protocollib")) {
+            plugin.logger.severe("[DropZone] ProtocolLib is not installed; fake entity packets are disabled.")
         }
     }
 }
